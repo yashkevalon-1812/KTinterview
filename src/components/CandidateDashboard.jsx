@@ -28,7 +28,8 @@ import {
   Sparkles,
   X,
   Edit3,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -228,36 +229,59 @@ export default function CandidateDashboard({ currentUser }) {
       return;
     }
 
+    if (isEditing && !cvPreview) {
+      setErrorMsg('Please select or upload a new CV document (PDF or Photo) to update.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
     try {
       const candId = tokenNumber || currentUser.email;
-      const payload = {
-        fullName: formData.fullName,
-        phone: formData.phone,
-        email: formData.email,
-        currentAddress: formData.currentAddress,
-        department: formData.department,
-        domain: formData.domain,
-        appliedRole: formData.domain || formData.department
-      };
-
-      // Include CV file if uploaded
-      if (cvPreview) {
-        payload.resumeBase64 = cvPreview;
-        payload.resumeFileName = cvFileName;
-        payload.resumeFileType = cvFileType === 'pdf' ? 'application/pdf' : 'image/jpeg';
+      let payload;
+      if (isEditing) {
+        // Candidate edit mode: ONLY CV document is updated
+        payload = {
+          resumeBase64: cvPreview,
+          resumeFileName: cvFileName,
+          resumeFileType: cvFileType === 'pdf' ? 'application/pdf' : 'image/jpeg'
+        };
+      } else {
+        payload = {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          email: formData.email,
+          currentAddress: formData.currentAddress,
+          department: formData.department,
+          domain: formData.domain,
+          appliedRole: formData.domain || formData.department
+        };
+        // Include CV file if uploaded
+        if (cvPreview) {
+          payload.resumeBase64 = cvPreview;
+          payload.resumeFileName = cvFileName;
+          payload.resumeFileType = cvFileType === 'pdf' ? 'application/pdf' : 'image/jpeg';
+        }
       }
 
       const res = await api.updateCandidate(candId, payload);
 
       if (res.success) {
-        setSuccessMsg('Your Candidate Details & CV have been saved successfully to MongoDB!');
+        setSuccessMsg(
+          isEditing 
+            ? 'Your CV document has been updated successfully in MongoDB!' 
+            : 'Your Candidate Details & CV have been saved successfully to MongoDB!'
+        );
         if (res.candidate && res.candidate.resumeLink) {
           setExistingResumeLink(res.candidate.resumeLink);
         }
+        // Reset preview state so it now points to the freshly saved link
+        setCvFile(null);
+        setCvPreview(null);
+        setCvFileName('');
+        setCvFileType('');
         isEditingRef.current = false;
         setIsEditing(false);
         setIsSubmitted(true); // Hide form
@@ -715,7 +739,11 @@ export default function CandidateDashboard({ currentUser }) {
             <div className="px-6 sm:px-8 py-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-black text-slate-900 brand-font flex items-center gap-2">
-                  {isSubmitted ? (
+                  {isEditing ? (
+                    <>
+                      <FileText className="w-5 h-5 text-[#034665]" /> Update CV / Resume Document
+                    </>
+                  ) : isSubmitted ? (
                     <>
                       <CheckCircle2 className="w-5 h-5 text-emerald-600" /> Candidate Profile (Submitted & Active)
                     </>
@@ -726,7 +754,9 @@ export default function CandidateDashboard({ currentUser }) {
                   )}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isSubmitted 
+                  {isEditing
+                    ? 'Candidate details are locked. Upload your updated PDF CV or Camera Photo below.'
+                    : isSubmitted 
                     ? 'Your details & CV are stored in MongoDB. The interview panel will call your token shortly.'
                     : 'Complete all details and upload your CV (PDF or Photo). Stored directly into Kevalon MongoDB.'}
                 </p>
@@ -737,9 +767,9 @@ export default function CandidateDashboard({ currentUser }) {
                   <button
                     onClick={handleStartEdit}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
-                    title="Edit or Update Profile / CV"
+                    title="Update CV Document"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-[#034665]" /> Edit Details
+                    <Edit3 className="w-3.5 h-3.5 text-[#034665]" /> Update CV Document
                   </button>
                 )}
                 <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-sky-50 text-[#034665] border border-sky-200">
@@ -769,6 +799,19 @@ export default function CandidateDashboard({ currentUser }) {
 
               {!isSubmitted ? (
                 <form onSubmit={handleSubmit} className="space-y-5 animate-fade-in">
+
+                {/* Candidate Profile Details Locked Banner when editing */}
+                {isEditing && (
+                  <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs sm:text-sm flex items-start gap-3 shadow-xs">
+                    <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Candidate Profile Details Locked</span>
+                      <span className="text-amber-800 text-xs leading-relaxed">
+                        Your candidate details (Name, Contact, Address, Department & Domain) are locked for interview evaluation. Only your CV / Resume document can be updated below.
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 {/* 2-Column Inputs Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -777,16 +820,27 @@ export default function CandidateDashboard({ currentUser }) {
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       1. Full Name <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         required
+                        disabled={isEditing}
+                        readOnly={isEditing}
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                         placeholder="Enter your full name"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                          isEditing 
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800'
+                        }`}
                       />
                     </div>
                   </div>
@@ -795,16 +849,27 @@ export default function CandidateDashboard({ currentUser }) {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       2. Mobile Number <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="tel"
                         required
+                        disabled={isEditing}
+                        readOnly={isEditing}
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="10-digit mobile number"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                          isEditing 
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800'
+                        }`}
                       />
                     </div>
                   </div>
@@ -813,16 +878,27 @@ export default function CandidateDashboard({ currentUser }) {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       3. Email ID <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="email"
                         required
+                        disabled={isEditing}
+                        readOnly={isEditing}
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="yourname@gmail.com"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                          isEditing 
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800'
+                        }`}
                       />
                     </div>
                   </div>
@@ -831,16 +907,27 @@ export default function CandidateDashboard({ currentUser }) {
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       4. Current Address <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                       <textarea
                         rows={2}
                         required
+                        disabled={isEditing}
+                        readOnly={isEditing}
                         value={formData.currentAddress}
                         onChange={(e) => setFormData({ ...formData, currentAddress: e.target.value })}
                         placeholder="Enter your current residential address, city, state, pin code"
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm ${
+                          isEditing 
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800'
+                        }`}
                       />
                     </div>
                   </div>
@@ -849,6 +936,11 @@ export default function CandidateDashboard({ currentUser }) {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       5. Department <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <Building className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -856,7 +948,12 @@ export default function CandidateDashboard({ currentUser }) {
                         value={formData.department}
                         onChange={(e) => handleDepartmentChange(e.target.value)}
                         required
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm font-semibold text-slate-800 bg-white cursor-pointer"
+                        disabled={isEditing}
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold ${
+                          isEditing 
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800 bg-white cursor-pointer'
+                        }`}
                       >
                         <option value="">-- Select Department --</option>
                         {departmentOptions.map((dept) => (
@@ -872,6 +969,11 @@ export default function CandidateDashboard({ currentUser }) {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       6. Domain <span className="text-red-500 font-black ml-0.5">*</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md ml-2 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5" /> Locked
+                        </span>
+                      )}
                     </label>
                     <div className="relative">
                       <Layers className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -879,8 +981,12 @@ export default function CandidateDashboard({ currentUser }) {
                         value={formData.domain}
                         onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
                         required
-                        disabled={!formData.department}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm font-medium text-slate-800 bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
+                        disabled={isEditing || !formData.department}
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium ${
+                          isEditing || !formData.department
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-none' 
+                            : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-slate-800 bg-white cursor-pointer'
+                        }`}
                       >
                         <option value="">
                           {formData.department ? '-- Select Domain --' : '-- Select Department First --'}
@@ -893,7 +999,9 @@ export default function CandidateDashboard({ currentUser }) {
                       </select>
                     </div>
                     <span className="text-[11px] text-slate-400 mt-1 block">
-                      {formData.department ? (
+                      {isEditing ? (
+                        <>Assigned Role: <b>{formData.domain || formData.department}</b> (Locked)</>
+                      ) : formData.department ? (
                         <>Role under <b>{formData.department}</b></>
                       ) : (
                         'Please choose your department first'
@@ -906,7 +1014,14 @@ export default function CandidateDashboard({ currentUser }) {
                 {/* 7. Upload CV / Resume (PDF or Photo / Image) - DIRECTLY BELOW DOMAIN */}
                 <div className="pt-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                    <span>7. Upload CV / Resume (PDF or Photo)</span>
+                    <span className="flex items-center gap-2">
+                      <span>7. Upload CV / Resume (PDF or Photo)</span>
+                      {isEditing && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Editable (Upload New CV)
+                        </span>
+                      )}
+                    </span>
                     <span className="text-[11px] font-normal text-slate-400 lowercase">Upload PDF or take/upload photo</span>
                   </label>
 
@@ -1016,7 +1131,7 @@ export default function CandidateDashboard({ currentUser }) {
                       onClick={handleCancelEdit}
                       className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold text-xs sm:text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer border border-slate-300 shadow-xs"
                     >
-                      Cancel & Keep Current Details
+                      Cancel & Keep Current CV
                     </button>
                   )}
                   <button
@@ -1027,6 +1142,10 @@ export default function CandidateDashboard({ currentUser }) {
                     {loading ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" /> Saving to MongoDB...
+                      </>
+                    ) : isEditing ? (
+                      <>
+                        <Save className="w-4 h-4" /> Save & Update CV Document
                       </>
                     ) : (
                       <>
@@ -1191,7 +1310,7 @@ export default function CandidateDashboard({ currentUser }) {
                     onClick={handleStartEdit}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
-                    <Edit3 className="w-4 h-4 text-[#034665]" /> Edit Information / Update CV
+                    <Edit3 className="w-4 h-4 text-[#034665]" /> Update / Re-upload CV Document
                   </button>
                 </div>
 
