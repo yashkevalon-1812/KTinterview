@@ -59,4 +59,20 @@ export const api = {
     const res = await fetch(`${API_BASE}/stats`);
     return await res.json();
   },
+
+  // Get Dynamic Master Departments & Domains from MongoDB
+  async getDepartments() {
+    const res = await fetch(`${API_BASE}/departments`);
+    return await res.json();
+  },
+
+  // Save / Update Department in MongoDB
+  async saveDepartment(data) {
+    const res = await fetch(`${API_BASE}/departments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  },
 };

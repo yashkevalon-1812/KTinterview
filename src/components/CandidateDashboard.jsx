@@ -40,7 +40,7 @@ export default function CandidateDashboard({ currentUser }) {
   });
 
   const [tokenNumber, setTokenNumber] = useState(
-    currentUser?.tokenNumber || currentUser?.candidateProfile?.tokenNumber || 'KT-106'
+    currentUser?.tokenNumber || currentUser?.candidateProfile?.tokenNumber || ''
   );
   const [status, setStatus] = useState(
     currentUser?.candidateProfile?.status || 'Waiting'
@@ -72,62 +72,20 @@ export default function CandidateDashboard({ currentUser }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Department options mapping to common domains
-  const departmentOptions = [
-    {
-      name: 'Information Technology (IT / Software)',
-      domains: [
-        'Full Stack MERN Development',
-        'React.js Frontend Developer',
-        'Node.js / Express Backend Developer',
-        'Flutter Mobile App Developer',
-        'Python / AI / Data Analytics',
-        'Java / Spring Boot Development'
-      ]
-    },
-    {
-      name: 'Quality Assurance & Testing (QA)',
-      domains: [
-        'Manual Software Testing',
-        'Automation Testing (Selenium / Cypress)',
-        'API & Performance Testing (Postman / JMeter)',
-        'Security Testing'
-      ]
-    },
-    {
-      name: 'UI/UX & Product Design',
-      domains: [
-        'UI/UX Design (Figma / Adobe XD)',
-        'Product Design & Prototyping',
-        'Graphic & Brand Identity Design',
-        'Web & Motion Design'
-      ]
-    },
-    {
-      name: 'Human Resources (HR)',
-      domains: [
-        'Talent Acquisition & Technical Hiring',
-        'HR Operations & Employee Relations',
-        'Training & Development'
-      ]
-    },
-    {
-      name: 'Business Development & Sales',
-      domains: [
-        'IT Sales & Client Acquisition',
-        'Pre-Sales & Technical Bidding (Upwork / Freelancer)',
-        'Account Management'
-      ]
-    },
-    {
-      name: 'Digital Marketing',
-      domains: [
-        'SEO / Search Engine Optimization',
-        'Performance Marketing & Google Ads',
-        'Social Media Management (SMM)'
-      ]
+  // Dynamic Departments & Domains fetched from MongoDB
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+
+  // Fetch dynamic departments from MongoDB
+  const loadDynamicDepartments = async () => {
+    try {
+      const res = await api.getDepartments();
+      if (res.success && res.departments) {
+        setDepartmentOptions(res.departments);
+      }
+    } catch (err) {
+      console.error('Failed to load dynamic departments from MongoDB:', err);
     }
-  ];
+  };
 
   // Fetch candidate's fresh profile from MongoDB
   const fetchFreshData = async () => {
@@ -137,8 +95,8 @@ export default function CandidateDashboard({ currentUser }) {
       if (res.success && res.candidates && res.candidates.length > 0) {
         const myProfile = res.candidates.find(
           c => c.email.toLowerCase() === currentUser.email.toLowerCase() || 
-               c.tokenNumber === currentUser.tokenNumber
-        ) || res.candidates[0];
+               (currentUser.tokenNumber && c.tokenNumber === currentUser.tokenNumber)
+        );
 
         if (myProfile) {
           setFormData(prev => ({
@@ -169,6 +127,7 @@ export default function CandidateDashboard({ currentUser }) {
   };
 
   useEffect(() => {
+    loadDynamicDepartments();
     fetchFreshData();
     // Auto polling every 5 seconds for live Admin assignment and Pass/Fail updates
     const interval = setInterval(fetchFreshData, 5000);

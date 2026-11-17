@@ -481,22 +481,26 @@ export default function AdminDashboard({ currentUser }) {
 
             <form onSubmit={handleAssignSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Interviewer</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Interviewer (from MongoDB)</label>
                 <select
                   value={targetInterviewer}
                   onChange={(e) => {
+                    const chosen = interviewers.find(i => i.name === e.target.value);
                     setTargetInterviewer(e.target.value);
-                    if (e.target.value === 'Priya Shah') setTargetRoom('Room 2 - Frontend Round');
-                    else if (e.target.value === 'Vikas Mehta') setTargetRoom('Room 3 - HR & Culture Round');
-                    else if (e.target.value === 'Yash Vaghasiya') setTargetRoom('Room 1 - Tech Round');
-                    else setTargetRoom('Room 1 - Tech Round');
+                    if (chosen && chosen.room) {
+                      setTargetRoom(chosen.room);
+                    } else if (e.target.value) {
+                      setTargetRoom('Room 1 - Tech Round');
+                    }
                   }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white"
                 >
-                  <option value="Yash Vaghasiya">Yash Vaghasiya (Technical Interviewer)</option>
-                  <option value="Rohit Patel">Rohit Patel (Senior Tech Lead)</option>
-                  <option value="Priya Shah">Priya Shah (Frontend Lead)</option>
-                  <option value="Vikas Mehta">Vikas Mehta (HR Manager)</option>
+                  <option value="">-- Choose Interviewer from Database --</option>
+                  {interviewers.map((int) => (
+                    <option key={int._id || int.email} value={int.name}>
+                      {int.name} ({int.designation || 'Interviewer'}) &bull; {int.room || 'Room 1'}
+                    </option>
+                  ))}
                 </select>
               </div>
 
