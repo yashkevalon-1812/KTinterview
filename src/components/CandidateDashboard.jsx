@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, 
   Phone, 
@@ -78,6 +78,22 @@ export default function CandidateDashboard({ currentUser }) {
   const [isEditing, setIsEditing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Refs to avoid stale closures in polling interval
+  const isEditingRef = useRef(false);
+  const initialProfileLoadedRef = useRef(false);
+
+  const handleStartEdit = () => {
+    isEditingRef.current = true;
+    setIsEditing(true);
+    setIsSubmitted(false);
+  };
+
+  const handleCancelEdit = () => {
+    isEditingRef.current = false;
+    setIsEditing(false);
+    setIsSubmitted(true);
+  };
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -110,15 +126,19 @@ export default function CandidateDashboard({ currentUser }) {
         );
 
         if (myProfile) {
-          setFormData(prev => ({
-            ...prev,
-            fullName: myProfile.fullName || prev.fullName || '',
-            phone: myProfile.phone || prev.phone || '',
-            email: myProfile.email || prev.email || '',
-            currentAddress: myProfile.currentAddress || prev.currentAddress || '',
-            department: myProfile.department || prev.department || '',
-            domain: myProfile.domain || prev.domain || ''
-          }));
+          // Only update formData from server if candidate is NOT actively editing
+          if (!isEditingRef.current) {
+            setFormData(prev => ({
+              ...prev,
+              fullName: myProfile.fullName || prev.fullName || '',
+              phone: myProfile.phone || prev.phone || '',
+              email: myProfile.email || prev.email || '',
+              currentAddress: myProfile.currentAddress || prev.currentAddress || '',
+              department: myProfile.department || prev.department || '',
+              domain: myProfile.domain || prev.domain || ''
+            }));
+          }
+
           setTokenNumber(myProfile.tokenNumber || tokenNumber);
           setStatus(myProfile.status || 'Waiting');
           setAssignedInterviewer(myProfile.assignedInterviewer || 'Unassigned');
@@ -128,9 +148,13 @@ export default function CandidateDashboard({ currentUser }) {
           if (myProfile.resumeLink) {
             setExistingResumeLink(myProfile.resumeLink);
           }
-          // If candidate already has submitted details in MongoDB and not actively editing, hide form
-          if (myProfile.department && (myProfile.currentAddress || myProfile.resumeLink)) {
-            setIsSubmitted(prev => isEditing ? false : true);
+
+          // Initial check only once on first load: if already saved in MongoDB, show submitted view
+          if (!initialProfileLoadedRef.current) {
+            initialProfileLoadedRef.current = true;
+            if (myProfile.department && (myProfile.currentAddress || myProfile.resumeLink)) {
+              setIsSubmitted(true);
+            }
           }
         }
       }
@@ -234,6 +258,7 @@ export default function CandidateDashboard({ currentUser }) {
         if (res.candidate && res.candidate.resumeLink) {
           setExistingResumeLink(res.candidate.resumeLink);
         }
+        isEditingRef.current = false;
         setIsEditing(false);
         setIsSubmitted(true); // Hide form
         setShowSuccessModal(true); // Show confirmation popup
@@ -710,10 +735,7 @@ export default function CandidateDashboard({ currentUser }) {
               <div className="flex items-center gap-2.5 self-start sm:self-auto">
                 {isSubmitted && (
                   <button
-                    onClick={() => {
-                      setIsEditing(true);
-                      setIsSubmitted(false);
-                    }}
+                    onClick={handleStartEdit}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
                     title="Edit or Update Profile / CV"
                   >
@@ -986,12 +1008,21 @@ export default function CandidateDashboard({ currentUser }) {
                   </div>
                 </div>
 
-                {/* Submit Button */}
-                <div className="pt-2">
+                {/* Submit & Cancel Buttons */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold text-xs sm:text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer border border-slate-300 shadow-xs"
+                    >
+                      Cancel & Keep Current Details
+                    </button>
+                  )}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 px-6 rounded-2xl font-black text-sm text-white bg-[#034665] hover:bg-[#02334a] transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="flex-1 w-full py-3.5 px-6 rounded-2xl font-black text-sm text-white bg-[#034665] hover:bg-[#02334a] transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -1153,10 +1184,7 @@ export default function CandidateDashboard({ currentUser }) {
                     </a>
                   ) : (
                     <button
-                      onClick={() => {
-                        setIsEditing(true);
-                        setIsSubmitted(false);
-                      }}
+                      onClick={handleStartEdit}
                       className="px-4 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer self-start sm:self-auto"
                     >
                       Upload CV Now
@@ -1167,10 +1195,7 @@ export default function CandidateDashboard({ currentUser }) {
                 {/* Action Buttons to Edit or Re-open Pop-up */}
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200">
                   <button
-                    onClick={() => {
-                      setIsEditing(true);
-                      setIsSubmitted(false);
-                    }}
+                    onClick={handleStartEdit}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <Edit3 className="w-4 h-4 text-[#034665]" /> Edit Information / Update CV
