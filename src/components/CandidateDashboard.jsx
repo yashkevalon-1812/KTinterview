@@ -25,7 +25,10 @@ import {
   HelpCircle,
   FileCheck2,
   Calendar,
-  Sparkles
+  Sparkles,
+  X,
+  Edit3,
+  Check
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -66,6 +69,14 @@ export default function CandidateDashboard({ currentUser }) {
   const [cvFileName, setCvFileName] = useState('');
   const [cvFileType, setCvFileType] = useState('');
   const [existingResumeLink, setExistingResumeLink] = useState('');
+
+  // Form submission and popup modal states
+  const [isSubmitted, setIsSubmitted] = useState(() => {
+    const prof = currentUser?.candidateProfile;
+    return Boolean(prof?.department && (prof?.currentAddress || prof?.resumeLink));
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -116,6 +127,10 @@ export default function CandidateDashboard({ currentUser }) {
           setFeedbacks(myProfile.feedbacks || []);
           if (myProfile.resumeLink) {
             setExistingResumeLink(myProfile.resumeLink);
+          }
+          // If candidate already has submitted details in MongoDB and not actively editing, hide form
+          if (myProfile.department && (myProfile.currentAddress || myProfile.resumeLink)) {
+            setIsSubmitted(prev => isEditing ? false : true);
           }
         }
       }
@@ -219,6 +234,9 @@ export default function CandidateDashboard({ currentUser }) {
         if (res.candidate && res.candidate.resumeLink) {
           setExistingResumeLink(res.candidate.resumeLink);
         }
+        setIsEditing(false);
+        setIsSubmitted(true); // Hide form
+        setShowSuccessModal(true); // Show confirmation popup
         setTimeout(() => setSuccessMsg(''), 5000);
       } else {
         setErrorMsg(res.message || 'Failed to save details.');
@@ -604,11 +622,23 @@ export default function CandidateDashboard({ currentUser }) {
               </div>
 
               {/* Step 2 */}
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-sky-50/70 border border-sky-200">
-                <FileCheck2 className="w-4 h-4 text-[#034665] shrink-0 mt-0.5" />
+              <div className={`flex items-start gap-3 p-3 rounded-2xl transition-all ${
+                isSubmitted 
+                  ? 'bg-emerald-50/90 border border-emerald-300' 
+                  : 'bg-sky-50/70 border border-sky-200'
+              }`}>
+                {isSubmitted ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <FileCheck2 className="w-4 h-4 text-[#034665] shrink-0 mt-0.5" />
+                )}
                 <div>
-                  <span className="font-bold text-sky-950 block">2. CV / Resume Submission</span>
-                  <span className="text-sky-800 text-[11px]">Upload your PDF or take/upload photo below.</span>
+                  <span className={`font-bold block ${isSubmitted ? 'text-emerald-950' : 'text-sky-950'}`}>
+                    2. CV / Resume Submission {isSubmitted && <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-1.5 py-0.5 rounded-full ml-1">Submitted</span>}
+                  </span>
+                  <span className={`text-[11px] ${isSubmitted ? 'text-emerald-800' : 'text-sky-800'}`}>
+                    {isSubmitted ? 'Profile details & CV successfully submitted.' : 'Upload your PDF or take/upload photo below.'}
+                  </span>
                 </div>
               </div>
 
@@ -657,18 +687,43 @@ export default function CandidateDashboard({ currentUser }) {
           <div className="bg-white rounded-3xl shadow-lg border border-slate-200/90 overflow-hidden">
             
             {/* Form Header */}
-            <div className="px-6 sm:px-8 py-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="px-6 sm:px-8 py-5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-base sm:text-lg font-black text-slate-900 brand-font flex items-center gap-2">
-                  <User className="w-5 h-5 text-[#034665]" /> Candidate Profile & Interview Details
+                  {isSubmitted ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" /> Candidate Profile (Submitted & Active)
+                    </>
+                  ) : (
+                    <>
+                      <User className="w-5 h-5 text-[#034665]" /> Candidate Profile & Interview Details
+                    </>
+                  )}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Complete all details and upload your CV (PDF or Photo). Stored directly into Kevalon MongoDB.
+                  {isSubmitted 
+                    ? 'Your details & CV are stored in MongoDB. The interview panel will call your token shortly.'
+                    : 'Complete all details and upload your CV (PDF or Photo). Stored directly into Kevalon MongoDB.'}
                 </p>
               </div>
-              <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-sky-50 text-[#034665] border border-sky-200 self-start sm:self-auto">
-                Token: {tokenNumber}
-              </span>
+
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                {isSubmitted && (
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setIsSubmitted(false);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
+                    title="Edit or Update Profile / CV"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-[#034665]" /> Edit Details
+                  </button>
+                )}
+                <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-xl bg-sky-50 text-[#034665] border border-sky-200">
+                  Token: {tokenNumber}
+                </span>
+              </div>
             </div>
 
             {/* Form Body */}
@@ -690,7 +745,8 @@ export default function CandidateDashboard({ currentUser }) {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              {!isSubmitted ? (
+                <form onSubmit={handleSubmit} className="space-y-5 animate-fade-in">
                 
                 {/* 2-Column Inputs Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -950,6 +1006,186 @@ export default function CandidateDashboard({ currentUser }) {
                 </div>
 
               </form>
+            ) : (
+              /* Submitted Overview View (Form is Hidden) */
+              <div className="space-y-6 animate-fade-in">
+                
+                {/* Verified Submission Banner */}
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/70 border-2 border-emerald-300 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                      <CheckCircle2 className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-200/80 text-emerald-900 mb-1">
+                        ✔ Profile & CV Submitted
+                      </div>
+                      <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                        Form Successfully Submitted! (ફોર્મ સબમિટ થયેલ છે)
+                      </h4>
+                      <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                        Your profile is locked and available to Kevalon HR Admin and your Interviewer.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowSuccessModal(true)}
+                    className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> View Pop-up Receipt
+                  </button>
+                </div>
+
+                {/* Submitted Information Summary Grid */}
+                <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-200 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2 pb-2 border-b border-slate-200">
+                    <User className="w-4 h-4 text-[#034665]" /> Submitted Candidate Information
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    
+                    {/* Full Name */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Full Name
+                      </span>
+                      <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                        <User className="w-4 h-4 text-[#034665]" />
+                        <span>{formData.fullName || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Mobile Number */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Mobile Number
+                      </span>
+                      <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                        <Phone className="w-4 h-4 text-[#034665]" />
+                        <span>{formData.phone || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Email Address
+                      </span>
+                      <div className="flex items-center gap-2 text-slate-900 font-semibold text-xs sm:text-sm truncate">
+                        <Mail className="w-4 h-4 text-[#034665] shrink-0" />
+                        <span className="truncate">{formData.email || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Walk-in Token */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Assigned Walk-in Token
+                      </span>
+                      <div className="flex items-center gap-2 font-mono font-black text-sm text-[#034665]">
+                        <Award className="w-4 h-4 text-amber-500" />
+                        <span>{tokenNumber}</span>
+                      </div>
+                    </div>
+
+                    {/* Current Address */}
+                    <div className="md:col-span-2 bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Current Residential Address
+                      </span>
+                      <div className="flex items-start gap-2 text-slate-800 text-xs font-medium leading-relaxed">
+                        <MapPin className="w-4 h-4 text-[#034665] shrink-0 mt-0.5" />
+                        <span>{formData.currentAddress || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {/* Department */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Selected Department
+                      </span>
+                      <div className="flex items-center gap-2 text-[#034665] font-black text-xs sm:text-sm">
+                        <Building className="w-4 h-4 text-[#034665]" />
+                        <span>{formData.department || 'Not selected'}</span>
+                      </div>
+                    </div>
+
+                    {/* Domain */}
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block tracking-wider mb-1">
+                        Specialization / Domain Role
+                      </span>
+                      <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs sm:text-sm">
+                        <Layers className="w-4 h-4 text-emerald-600" />
+                        <span>{formData.domain || 'Not selected'}</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Uploaded CV Document Card */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#034665] flex items-center justify-center shrink-0 border border-sky-200">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 text-xs sm:text-sm block">
+                        Candidate Resume / CV Document
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        {existingResumeLink ? 'Saved and verified in Kevalon database' : 'No CV uploaded yet'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {existingResumeLink ? (
+                    <a
+                      href={api.getFileUrl(existingResumeLink)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#034665] hover:bg-[#02334a] text-white text-xs font-bold transition-all shadow-sm cursor-pointer self-start sm:self-auto"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-sky-300" /> View / Download CV
+                      <ExternalLink className="w-3 h-3 text-sky-300" />
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setIsEditing(true);
+                        setIsSubmitted(false);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer self-start sm:self-auto"
+                    >
+                      Upload CV Now
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Buttons to Edit or Re-open Pop-up */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200">
+                  <button
+                    onClick={() => {
+                      setIsEditing(true);
+                      setIsSubmitted(false);
+                    }}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <Edit3 className="w-4 h-4 text-[#034665]" /> Edit Information / Update CV
+                  </button>
+
+                  <button
+                    onClick={() => setShowSuccessModal(true)}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-50 text-[#034665] hover:bg-sky-100 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border border-sky-200 shadow-xs"
+                  >
+                    <Sparkles className="w-4 h-4 text-emerald-600" /> View Submit Confirmation Pop-up
+                  </button>
+                </div>
+
+              </div>
+            )}
 
             </div>
 
@@ -958,6 +1194,83 @@ export default function CandidateDashboard({ currentUser }) {
         </div>
 
       </div>
+
+      {/* Submission Success Pop-up Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative overflow-hidden text-center animate-scale-up">
+            {/* Decorative background glow */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-100/50 rounded-full blur-2xl pointer-events-none"></div>
+
+            {/* Close button */}
+            <button 
+              onClick={() => setShowSuccessModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close Pop-up"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Success Animated Badge */}
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-100 border-4 border-emerald-200 text-emerald-600 flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 brand-font tracking-tight">
+              Form Submitted Successfully!
+            </h3>
+            <p className="text-xs sm:text-sm font-semibold text-emerald-700 mt-1">
+              તમારું ઇન્ટરવ્યુ ફોર્મ અને CV સફળતાપૂર્વક સબમિટ થઈ ગયું છે.
+            </p>
+
+            {/* Summary Box */}
+            <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="font-semibold text-slate-500">Walk-in Token:</span>
+                <span className="font-mono font-black text-base text-[#034665] bg-sky-100/80 px-2.5 py-0.5 rounded-lg">
+                  {tokenNumber}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-500">Candidate Name:</span>
+                <span className="font-bold text-slate-900">{formData.fullName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-500">Department:</span>
+                <span className="font-bold text-slate-900">{formData.department || 'Not Specified'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-500">Domain / Role:</span>
+                <span className="font-bold text-slate-900">{formData.domain || 'Not Specified'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-500">Mobile:</span>
+                <span className="font-bold text-slate-900">{formData.phone}</span>
+              </div>
+              {existingResumeLink && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <span className="font-semibold text-slate-500">Uploaded CV:</span>
+                  <span className="font-bold text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Attached & Saved in MongoDB
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed mb-6">
+              તમારી પ્રોફાઇલ એડમિન અને ઇન્ટરવ્યુઅર પાસે પહોંચી ગઈ છે. કૃપા કરીને વેટિંગ લાઉન્જમાં શાંતિપૂર્વક બેસો, તમારા ટોકન નંબર <b>{tokenNumber}</b> નું એનાઉન્સમેન્ટ થશે.
+            </p>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm text-white bg-[#034665] hover:bg-[#02334a] transition-all shadow-lg cursor-pointer"
+            >
+              ઓકે, સમજાઈ ગયું (View Application Summary)
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
