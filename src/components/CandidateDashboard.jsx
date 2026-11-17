@@ -266,7 +266,7 @@ export default function CandidateDashboard({ currentUser }) {
               </div>
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-emerald-300 text-emerald-950 uppercase tracking-wider mb-2 shadow-xs">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-900" /> RESULT: PASSED / SELECTED (પસંદગી પામેલ છો)
+                  <CheckCircle2 className="w-4 h-4 text-emerald-900" /> RESULT: PASSED / SELECTED
                 </div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-black brand-font tracking-tight text-white">
                   Congratulations! You Have Passed the Walk-in Interview!
@@ -299,7 +299,7 @@ export default function CandidateDashboard({ currentUser }) {
               </div>
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-teal-300 text-teal-950 uppercase tracking-wider mb-2 shadow-xs">
-                  <CheckCircle2 className="w-4 h-4 text-teal-900" /> ROUND PASSED (રાઉન્ડ પાસ થયેલ છે)
+                  <CheckCircle2 className="w-4 h-4 text-teal-900" /> ROUND PASSED
                 </div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-black brand-font tracking-tight text-white">
                   Great Job! You Passed {status === 'Round 1 Passed' ? 'Round 1 (Technical)' : 'Round 2'}!
@@ -332,7 +332,7 @@ export default function CandidateDashboard({ currentUser }) {
               </div>
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-rose-200 text-rose-950 uppercase tracking-wider mb-2 shadow-xs">
-                  <XCircle className="w-4 h-4 text-rose-800" /> RESULT: FAILED / NOT CLEARED (ઇન્ટરવ્યુ ક્લિયર થયેલ નથી)
+                  <XCircle className="w-4 h-4 text-rose-800" /> RESULT: FAILED / NOT CLEARED
                 </div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-black brand-font tracking-tight text-white">
                   Interview Result: Not Cleared (Failed)
@@ -366,7 +366,7 @@ export default function CandidateDashboard({ currentUser }) {
               </div>
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-black bg-sky-300 text-sky-950 uppercase tracking-wider mb-2 shadow-xs">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> IN PROGRESS (ઇન્ટરવ્યુ ચાલુ છે)
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> INTERVIEW IN PROGRESS
                 </div>
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-black brand-font tracking-tight text-white">
                   Interview In Progress with {assignedInterviewer}
@@ -1021,7 +1021,7 @@ export default function CandidateDashboard({ currentUser }) {
                         ✔ Profile & CV Submitted
                       </div>
                       <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                        Form Successfully Submitted! (ફોર્મ સબમિટ થયેલ છે)
+                        Form Successfully Submitted!
                       </h4>
                       <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
                         Your profile is locked and available to Kevalon HR Admin and your Interviewer.
@@ -1220,7 +1220,7 @@ export default function CandidateDashboard({ currentUser }) {
               Form Submitted Successfully!
             </h3>
             <p className="text-xs sm:text-sm font-semibold text-emerald-700 mt-1">
-              તમારું ઇન્ટરવ્યુ ફોર્મ અને CV સફળતાપૂર્વક સબમિટ થઈ ગયું છે.
+              Your interview details and CV have been submitted successfully.
             </p>
 
             {/* Summary Box */}
@@ -1258,7 +1258,7 @@ export default function CandidateDashboard({ currentUser }) {
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed mb-6">
-              તમારી પ્રોફાઇલ એડમિન અને ઇન્ટરવ્યુઅર પાસે પહોંચી ગઈ છે. કૃપા કરીને વેટિંગ લાઉન્જમાં શાંતિપૂર્વક બેસો, તમારા ટોકન નંબર <b>{tokenNumber}</b> નું એનાઉન્સમેન્ટ થશે.
+              Your profile has been forwarded to the HR Admin and Interview Panel. Please wait in the waiting lounge; your token number <b>{tokenNumber}</b> will be called shortly.
             </p>
 
             {/* Action Button */}
@@ -1266,7 +1266,7 @@ export default function CandidateDashboard({ currentUser }) {
               onClick={() => setShowSuccessModal(false)}
               className="w-full py-3.5 px-6 rounded-2xl font-bold text-sm text-white bg-[#034665] hover:bg-[#02334a] transition-all shadow-lg cursor-pointer"
             >
-              ઓકે, સમજાઈ ગયું (View Application Summary)
+              Got it, Continue to Dashboard
             </button>
           </div>
         </div>
