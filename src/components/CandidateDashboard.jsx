@@ -1059,13 +1059,6 @@ export default function CandidateDashboard({ currentUser }) {
                       </p>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => setShowSuccessModal(true)}
-                    className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-xs flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> View Pop-up Receipt
-                  </button>
                 </div>
 
                 {/* Submitted Information Summary Grid */}
@@ -1192,20 +1185,13 @@ export default function CandidateDashboard({ currentUser }) {
                   )}
                 </div>
 
-                {/* Action Buttons to Edit or Re-open Pop-up */}
-                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200">
+                {/* Action Buttons to Edit */}
+                <div className="pt-2 flex items-center justify-start border-t border-slate-200">
                   <button
                     onClick={handleStartEdit}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:border-[#034665] text-slate-700 hover:text-[#034665] text-xs font-bold transition-all bg-white hover:bg-slate-50 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <Edit3 className="w-4 h-4 text-[#034665]" /> Edit Information / Update CV
-                  </button>
-
-                  <button
-                    onClick={() => setShowSuccessModal(true)}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-50 text-[#034665] hover:bg-sky-100 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border border-sky-200 shadow-xs"
-                  >
-                    <Sparkles className="w-4 h-4 text-emerald-600" /> View Submit Confirmation Pop-up
                   </button>
                 </div>
 
