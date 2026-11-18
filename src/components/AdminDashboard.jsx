@@ -7,7 +7,6 @@ import {
   AlertCircle, 
   Search, 
   Filter, 
-  UserPlus, 
   Eye, 
   UserCheck, 
   Star, 
@@ -58,22 +57,6 @@ export default function AdminDashboard({ currentUser }) {
   const [roundsModalCandidate, setRoundsModalCandidate] = useState(null);
   const [selectedRounds, setSelectedRounds] = useState(['Theory Round', 'Practical Round', 'HR Round']);
   const [savingRounds, setSavingRounds] = useState(false);
-
-  // New Candidate Modal
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newCandidate, setNewCandidate] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    appliedRole: 'React Developer',
-    experience: 'Fresher',
-    currentCtc: 'N/A',
-    expectedCtc: '4.5 LPA',
-    noticePeriod: 'Immediate',
-    skills: 'React, JavaScript, HTML, CSS',
-    resumeLink: '',
-    portfolio: ''
-  });
 
   // Load data
   const loadData = async () => {
@@ -190,33 +173,6 @@ export default function AdminDashboard({ currentUser }) {
     }
   };
 
-  // Handle Add New Walk-in Candidate
-  const handleAddNewCandidate = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await api.registerCandidate(newCandidate);
-      if (res.success) {
-        setShowAddModal(false);
-        setNewCandidate({
-          fullName: '',
-          email: '',
-          phone: '',
-          appliedRole: 'React Developer',
-          experience: 'Fresher',
-          currentCtc: 'N/A',
-          expectedCtc: '4.5 LPA',
-          noticePeriod: 'Immediate',
-          skills: 'React, JavaScript, HTML, CSS',
-          resumeLink: '',
-          portfolio: ''
-        });
-        loadData();
-      }
-    } catch (err) {
-      alert('Failed to register candidate');
-    }
-  };
-
   // Export CSV
   const exportToCSV = () => {
     const headers = ['Token', 'Name', 'Phone', 'Email', 'Role', 'Category', 'Salary / Internship', 'Status', 'Round', 'Assigned Interviewer', 'Latest Remark'];
@@ -296,15 +252,8 @@ export default function AdminDashboard({ currentUser }) {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-md hover:shadow-lg"
-          >
-            <UserPlus className="w-4 h-4" />
-            Check In Candidate
-          </button>
-          <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -983,105 +932,6 @@ export default function AdminDashboard({ currentUser }) {
                   className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50"
                 >
                   {savingRounds ? 'Saving...' : 'Save Rounds'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ADD WALK-IN MODAL */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200">
-            <h3 className="text-lg font-black text-slate-900 brand-font mb-1">
-              Add New Walk-in Candidate
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Front desk quick check-in. Generates token instantly.
-            </p>
-
-            <form onSubmit={handleAddNewCandidate} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newCandidate.fullName}
-                  onChange={(e) => setNewCandidate({ ...newCandidate, fullName: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800"
-                  placeholder="e.g. Divyesh Vaghasiya"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Mobile *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={newCandidate.phone}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800"
-                    placeholder="10-digit number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={newCandidate.email}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, email: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800"
-                    placeholder="email@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Role *</label>
-                  <select
-                    value={newCandidate.appliedRole}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, appliedRole: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white"
-                  >
-                    <option value="React Developer">React Developer</option>
-                    <option value="Node.js Backend Developer">Node.js Backend Developer</option>
-                    <option value="Full Stack MERN Developer">Full Stack MERN Developer</option>
-                    <option value="UI/UX Designer">UI/UX Designer</option>
-                    <option value="QA Engineer">QA Engineer</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Experience</label>
-                  <select
-                    value={newCandidate.experience}
-                    onChange={(e) => setNewCandidate({ ...newCandidate, experience: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white"
-                  >
-                    <option value="Fresher">Fresher</option>
-                    <option value="1-2 Years">1 - 2 Years</option>
-                    <option value="2-4 Years">2 - 4 Years</option>
-                    <option value="4+ Years">4+ Years</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-md"
-                >
-                  Generate Token & Check In
                 </button>
               </div>
             </form>
