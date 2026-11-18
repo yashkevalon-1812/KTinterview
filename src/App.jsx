@@ -7,31 +7,60 @@ import InterviewerDashboard from './components/InterviewerDashboard';
 import CandidateDashboard from './components/CandidateDashboard';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('kevalon_current_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  // Keep user session strictly in memory (no localStorage/sessionStorage persistence)
+  // so leaving the site, closing the tab/browser, or navigating away auto-logs out.
+  const [currentUser, setCurrentUser] = useState(null);
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Clear any old saved session and auto-logout whenever the user exits/leaves the page
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('kevalon_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('kevalon_current_user');
-    }
-  }, [currentUser]);
+    const clearStoredSession = () => {
+      try {
+        localStorage.removeItem('kevalon_current_user');
+        sessionStorage.removeItem('kevalon_current_user');
+      } catch {
+        // Ignore storage access errors
+      }
+    };
+
+    clearStoredSession();
+
+    const handleExitLogout = () => {
+      clearStoredSession();
+      setCurrentUser(null);
+      setAuthView('login');
+    };
+
+    const handlePageShow = (event) => {
+      // If browser restores the page from back/forward cache (bfcache), force logout
+      if (event.persisted) {
+        handleExitLogout();
+      }
+    };
+
+    window.addEventListener('pagehide', handleExitLogout);
+    window.addEventListener('beforeunload', handleExitLogout);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      window.removeEventListener('pagehide', handleExitLogout);
+      window.removeEventListener('beforeunload', handleExitLogout);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
   };
 
   const handleLogout = () => {
+    try {
+      localStorage.removeItem('kevalon_current_user');
+      sessionStorage.removeItem('kevalon_current_user');
+    } catch {
+      // Ignore storage access errors
+    }
     setCurrentUser(null);
     setAuthView('login');
   };
