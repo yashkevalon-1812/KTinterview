@@ -57,8 +57,13 @@ export default function CandidateDashboard({ currentUser }) {
   const [room, setRoom] = useState(
     currentUser?.room || currentUser?.candidateProfile?.room || 'Waiting Lounge'
   );
+  const [assignedRounds, setAssignedRounds] = useState(
+    currentUser?.assignedRounds ||
+    currentUser?.candidateProfile?.assignedRounds ||
+    ['Theory Round', 'Practical Round', 'HR Round']
+  );
   const [currentRound, setCurrentRound] = useState(
-    currentUser?.currentRound || currentUser?.candidateProfile?.currentRound || 'Round 1: Technical'
+    currentUser?.currentRound || currentUser?.candidateProfile?.currentRound || 'Theory Round'
   );
   const [feedbacks, setFeedbacks] = useState(
     currentUser?.feedbacks || currentUser?.candidateProfile?.feedbacks || []
@@ -144,7 +149,10 @@ export default function CandidateDashboard({ currentUser }) {
           setStatus(myProfile.status || 'Waiting');
           setAssignedInterviewer(myProfile.assignedInterviewer || 'Unassigned');
           setRoom(myProfile.room || 'Waiting Lounge');
-          setCurrentRound(myProfile.currentRound || 'Round 1: Technical');
+          if (Array.isArray(myProfile.assignedRounds) && myProfile.assignedRounds.length > 0) {
+            setAssignedRounds(myProfile.assignedRounds);
+          }
+          setCurrentRound(myProfile.currentRound || 'Theory Round');
           setFeedbacks(myProfile.feedbacks || []);
           if (myProfile.resumeLink) {
             setExistingResumeLink(myProfile.resumeLink);
@@ -555,11 +563,27 @@ export default function CandidateDashboard({ currentUser }) {
                 Interview Round
               </span>
               <span className="text-sm sm:text-base font-extrabold text-slate-900 block mt-0.5 truncate">
-                {currentRound || 'Round 1: Technical'}
+                {currentRound || assignedRounds[0] || 'Theory Round'}
               </span>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Stage {currentRound.includes('Round 2') ? '2 of 3' : currentRound.includes('Round 3') ? '3 of 3' : '1 of 3'}
+                {currentRound === 'Completed'
+                  ? `All ${assignedRounds.length} ${assignedRounds.length === 1 ? 'Round' : 'Rounds'} Completed`
+                  : `Stage ${Math.max(1, assignedRounds.indexOf(currentRound) + 1)} of ${assignedRounds.length}`}
               </span>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {assignedRounds.map((r, i) => (
+                  <span
+                    key={r}
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${
+                      currentRound === r
+                        ? 'bg-[#034665] text-white border-[#034665]'
+                        : 'bg-white text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {i + 1}. {r.replace(' Round', '')}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 

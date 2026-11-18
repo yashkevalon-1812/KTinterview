@@ -15,9 +15,25 @@ import {
   ChevronRight,
   TrendingUp,
   Download,
-  Building
+  Building,
+  Layers,
+  Check
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const ALL_INTERVIEW_ROUNDS = [
+  { id: 'Theory Round', num: 1, label: '1. Theory Round', short: '1. Theory', desc: 'Conceptual & core technical Q&A' },
+  { id: 'Practical Round', num: 2, label: '2. Practical Round', short: '2. Practical', desc: 'Hands-on task / live coding test' },
+  { id: 'HR Round', num: 3, label: '3. HR Round', short: '3. HR', desc: 'Culture fit, salary & final discussion' }
+];
+
+const getCandidateRounds = (cand) => {
+  if (Array.isArray(cand?.assignedRounds) && cand.assignedRounds.length > 0) {
+    const ordered = ALL_INTERVIEW_ROUNDS.map(r => r.id).filter(id => cand.assignedRounds.includes(id));
+    if (ordered.length > 0) return ordered;
+  }
+  return ALL_INTERVIEW_ROUNDS.map(r => r.id);
+};
 
 export default function AdminDashboard({ currentUser }) {
   const [candidates, setCandidates] = useState([]);
@@ -35,6 +51,13 @@ export default function AdminDashboard({ currentUser }) {
   const [assignInterviewerModal, setAssignInterviewerModal] = useState(false);
   const [targetInterviewer, setTargetInterviewer] = useState('');
   const [targetRoom, setTargetRoom] = useState('Room 1 - Tech Round');
+  const [targetRounds, setTargetRounds] = useState(['Theory Round', 'Practical Round', 'HR Round']);
+  const [targetCurrentRound, setTargetCurrentRound] = useState('Theory Round');
+
+  // Person-wise Interview Rounds Modal
+  const [roundsModalCandidate, setRoundsModalCandidate] = useState(null);
+  const [selectedRounds, setSelectedRounds] = useState(['Theory Round', 'Practical Round', 'HR Round']);
+  const [savingRounds, setSavingRounds] = useState(false);
 
   // New Candidate Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,7 +111,62 @@ export default function AdminDashboard({ currentUser }) {
     }
   };
 
-  // Handle Assign Interviewer & Room
+  // Helper to toggle a round while keeping canonical order (Theory -> Practical -> HR)
+  const toggleRoundInList = (roundId, currentList, setList, onChangeCurrent) => {
+    const exists = currentList.includes(roundId);
+    if (exists && currentList.length === 1) {
+      return; // Must keep at least 1 round selected
+    }
+    const rawNext = exists
+      ? currentList.filter(r => r !== roundId)
+      : [...currentList, roundId];
+    const orderedNext = ALL_INTERVIEW_ROUNDS.map(r => r.id).filter(id => rawNext.includes(id));
+    setList(orderedNext);
+    if (onChangeCurrent && !orderedNext.includes(targetCurrentRound)) {
+      onChangeCurrent(orderedNext[0]);
+    }
+  };
+
+  // Open Person-wise Interview Rounds modal
+  const openRoundsModal = (candidate) => {
+    const candRounds = getCandidateRounds(candidate);
+    setRoundsModalCandidate(candidate);
+    setSelectedRounds(candRounds);
+  };
+
+  // Save Person-wise Interview Rounds to MongoDB
+  const handleSaveRounds = async (e) => {
+    e.preventDefault();
+    if (!roundsModalCandidate || selectedRounds.length === 0) return;
+
+    setSavingRounds(true);
+    try {
+      const ordered = ALL_INTERVIEW_ROUNDS.map(r => r.id).filter(id => selectedRounds.includes(id));
+      const payload = { assignedRounds: ordered };
+      if (roundsModalCandidate.currentRound !== 'Completed' && !ordered.includes(roundsModalCandidate.currentRound)) {
+        payload.currentRound = ordered[0];
+      }
+      const res = await api.updateCandidate(
+        roundsModalCandidate._id || roundsModalCandidate.tokenNumber,
+        payload
+      );
+      if (res.success) {
+        if (selectedCandidate && selectedCandidate._id === roundsModalCandidate._id) {
+          setSelectedCandidate(res.candidate);
+        }
+        setRoundsModalCandidate(null);
+        loadData();
+      } else {
+        alert(res.message || 'Failed to update interview rounds');
+      }
+    } catch (err) {
+      alert('Failed to update interview rounds');
+    } finally {
+      setSavingRounds(false);
+    }
+  };
+
+  // Handle Assign Interviewer & Room (with person-wise rounds)
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
     if (!selectedCandidate) return;
@@ -96,11 +174,20 @@ export default function AdminDashboard({ currentUser }) {
       alert('Please select a registered interviewer.');
       return;
     }
+    if (!targetRounds || targetRounds.length === 0) {
+      alert('Please select at least one interview round.');
+      return;
+    }
 
     try {
+      const orderedRounds = ALL_INTERVIEW_ROUNDS.map(r => r.id).filter(id => targetRounds.includes(id));
+      const activeRound = orderedRounds.includes(targetCurrentRound) ? targetCurrentRound : orderedRounds[0];
+
       await api.updateCandidate(selectedCandidate._id || selectedCandidate.tokenNumber, {
         assignedInterviewer: targetInterviewer,
         room: targetRoom,
+        assignedRounds: orderedRounds,
+        currentRound: activeRound,
         status: 'In-Interview'
       });
       setAssignInterviewerModal(false);
@@ -415,10 +502,28 @@ export default function AdminDashboard({ currentUser }) {
                       {getStatusBadge(c.status)}
                     </td>
 
-                    {/* Room & Round */}
+                    {/* Room & Person-Wise Rounds */}
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-slate-800">{c.room || 'Lounge'}</div>
-                      <div className="text-[10px] text-slate-500">{c.currentRound}</div>
+                      <div className="text-[10px] font-semibold text-[#034665]">{c.currentRound}</div>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {getCandidateRounds(c).map((roundId) => {
+                          const rMeta = ALL_INTERVIEW_ROUNDS.find(r => r.id === roundId);
+                          const isCurrent = c.currentRound === roundId;
+                          return (
+                            <span
+                              key={roundId}
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${
+                                isCurrent
+                                  ? 'bg-[#034665] text-white border-[#034665]'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              {rMeta ? rMeta.short : roundId}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </td>
 
                     {/* Interviewer */}
@@ -432,16 +537,29 @@ export default function AdminDashboard({ currentUser }) {
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         
+                        {/* Set Person-Wise Rounds */}
+                        <button
+                          onClick={() => openRoundsModal(c)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs transition-colors cursor-pointer"
+                          title="Set Interview Rounds for this Candidate (Theory / Practical / HR)"
+                        >
+                          <Layers className="w-3 h-3" />
+                          Rounds ({getCandidateRounds(c).length})
+                        </button>
+
                         {/* Assign Room / Interviewer */}
                         <button
                           onClick={() => {
+                            const candRounds = getCandidateRounds(c);
                             setSelectedCandidate(c);
                             const isRegisteredAssigned = interviewers.some(i => i.name === c.assignedInterviewer);
                             setTargetInterviewer(isRegisteredAssigned ? c.assignedInterviewer : '');
                             setTargetRoom(c.room && c.room !== 'Waiting Lounge' ? c.room : 'Room 1 - Tech Round');
+                            setTargetRounds(candRounds);
+                            setTargetCurrentRound(candRounds.includes(c.currentRound) ? c.currentRound : candRounds[0]);
                             setAssignInterviewerModal(true);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-[#034665] font-bold text-xs transition-colors"
+                          className="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-[#034665] font-bold text-xs transition-colors cursor-pointer"
                           title="Assign to Interviewer & Room"
                         >
                           Dispatch
@@ -450,7 +568,7 @@ export default function AdminDashboard({ currentUser }) {
                         {/* Quick View Details */}
                         <button
                           onClick={() => setSelectedCandidate(c)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                           title="View Details & Scorecard History"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -515,6 +633,55 @@ export default function AdminDashboard({ currentUser }) {
                     No interviewers have registered yet. Once an interviewer registers, their name will automatically appear here.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Person-Wise Interview Rounds ({targetRounds.length} Selected)
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {ALL_INTERVIEW_ROUNDS.map((r) => {
+                    const checked = targetRounds.includes(r.id);
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => toggleRoundInList(r.id, targetRounds, setTargetRounds, setTargetCurrentRound)}
+                        className={`flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          checked
+                            ? 'bg-[#034665] text-white border-[#034665] shadow-xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                          checked ? 'bg-white text-[#034665] border-white' : 'border-slate-300 bg-white'
+                        }`}>
+                          {checked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </span>
+                        <span>{r.short}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active Round to Dispatch */}
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 mt-2">
+                  Dispatch For Round
+                </label>
+                <select
+                  value={targetCurrentRound}
+                  onChange={(e) => setTargetCurrentRound(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white"
+                >
+                  {targetRounds.map((roundId) => {
+                    const rMeta = ALL_INTERVIEW_ROUNDS.find(r => r.id === roundId);
+                    return (
+                      <option key={roundId} value={roundId}>
+                        {rMeta ? rMeta.label : roundId}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <div>
@@ -606,6 +773,28 @@ export default function AdminDashboard({ currentUser }) {
                 <span className="text-slate-500 font-semibold">Assigned Evaluator & Room:</span>
                 <span className="font-medium text-slate-800">{selectedCandidate.assignedInterviewer} ({selectedCandidate.room})</span>
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200">
+                <div>
+                  <span className="text-indigo-900 font-bold block">Assigned Interview Rounds ({getCandidateRounds(selectedCandidate).length}):</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {getCandidateRounds(selectedCandidate).map((roundId) => {
+                      const rMeta = ALL_INTERVIEW_ROUNDS.find(r => r.id === roundId);
+                      return (
+                        <span key={roundId} className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-white text-indigo-800 border border-indigo-200">
+                          {rMeta ? rMeta.label : roundId}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openRoundsModal(selectedCandidate)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer transition-colors"
+                >
+                  Change Rounds
+                </button>
+              </div>
               {selectedCandidate.resumeLink && (
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-sky-50 text-[#034665]">
                   <span className="font-semibold">Candidate Resume:</span>
@@ -690,6 +879,157 @@ export default function AdminDashboard({ currentUser }) {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* SET PERSON-WISE INTERVIEW ROUNDS MODAL */}
+      {roundsModalCandidate && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-scale-up">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 brand-font flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-600" /> Set Candidate Interview Rounds
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Token: <b>{roundsModalCandidate.tokenNumber}</b> &bull; {roundsModalCandidate.fullName} ({roundsModalCandidate.experience || 'Candidate'})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoundsModalCandidate(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRounds} className="space-y-4">
+              {/* Quick Presets */}
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Quick Presets
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRounds(['Theory Round'])}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      selectedRounds.length === 1 && selectedRounds[0] === 'Theory Round'
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Fresher (Theory Only)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRounds(['Theory Round', 'Practical Round'])}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      selectedRounds.length === 2 && selectedRounds.includes('Theory Round') && selectedRounds.includes('Practical Round')
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Theory + Practical
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRounds(['Theory Round', 'HR Round'])}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      selectedRounds.length === 2 && selectedRounds.includes('Theory Round') && selectedRounds.includes('HR Round')
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Theory + HR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRounds(['Theory Round', 'Practical Round', 'HR Round'])}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      selectedRounds.length === 3
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    All 3 Rounds
+                  </button>
+                </div>
+              </div>
+
+              {/* 3 Selectable Round Cards */}
+              <div className="space-y-2.5">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Select Rounds for {roundsModalCandidate.fullName}
+                </span>
+                {ALL_INTERVIEW_ROUNDS.map((r) => {
+                  const isChecked = selectedRounds.includes(r.id);
+                  const isOnlyOne = isChecked && selectedRounds.length === 1;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => toggleRoundInList(r.id, selectedRounds, setSelectedRounds)}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                        isChecked
+                          ? 'bg-sky-50/70 border-[#034665] shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors ${
+                          isChecked
+                            ? 'bg-[#034665] border-[#034665] text-white'
+                            : 'bg-white border-slate-300'
+                        }`}>
+                          {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+                        <div>
+                          <span className={`text-xs sm:text-sm font-extrabold block ${isChecked ? 'text-[#034665]' : 'text-slate-700'}`}>
+                            {r.label}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">{r.desc}</span>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isChecked
+                          ? 'bg-[#034665] text-white'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {isOnlyOne ? 'Min 1' : isChecked ? 'Enabled' : 'Skipped'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Summary Preview */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                <span className="font-bold text-slate-900">Selected Plan ({selectedRounds.length} {selectedRounds.length === 1 ? 'Round' : 'Rounds'}): </span>
+                <span className="text-[#034665] font-semibold">
+                  {selectedRounds.join(' → ')}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRoundsModalCandidate(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRounds || selectedRounds.length === 0}
+                  className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {savingRounds ? 'Saving...' : 'Save Rounds'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

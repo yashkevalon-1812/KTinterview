@@ -17,6 +17,16 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 
+const ALL_ROUNDS = ['Theory Round', 'Practical Round', 'HR Round'];
+
+const getCandidateRounds = (cand) => {
+  if (Array.isArray(cand?.assignedRounds) && cand.assignedRounds.length > 0) {
+    const ordered = ALL_ROUNDS.filter(r => cand.assignedRounds.includes(r));
+    if (ordered.length > 0) return ordered;
+  }
+  return ALL_ROUNDS;
+};
+
 export default function InterviewerDashboard({ currentUser }) {
   const [candidates, setCandidates] = useState([]);
   const [activeInterviewCandidate, setActiveInterviewCandidate] = useState(null);
@@ -26,8 +36,8 @@ export default function InterviewerDashboard({ currentUser }) {
   // Scorecard state
   const [round, setRound] = useState(
     currentUser?.designation?.toLowerCase().includes('hr') 
-      ? 'Round 3: HR' 
-      : 'Round 1: Technical'
+      ? 'HR Round' 
+      : 'Theory Round'
   );
   const [technicalRating, setTechnicalRating] = useState(4);
   const [problemSolvingRating, setProblemSolvingRating] = useState(4);
@@ -69,18 +79,25 @@ export default function InterviewerDashboard({ currentUser }) {
 
   // Start Interview action
   const handleStartInterview = async (candidate) => {
+    const candRounds = getCandidateRounds(candidate);
+    const startRound = candRounds.includes(candidate.currentRound)
+      ? candidate.currentRound
+      : candRounds[0];
+    setRound(startRound);
+
     try {
       await api.updateCandidate(candidate._id || candidate.tokenNumber, {
         status: 'In-Interview',
         assignedInterviewer: interviewerName,
         room: interviewerRoom,
-        currentRound: round
+        currentRound: startRound
       });
       setActiveInterviewCandidate({
         ...candidate,
         status: 'In-Interview',
         assignedInterviewer: interviewerName,
-        room: interviewerRoom
+        room: interviewerRoom,
+        currentRound: startRound
       });
       loadCandidates();
     } catch (err) {
@@ -283,6 +300,9 @@ export default function InterviewerDashboard({ currentUser }) {
                             if (c.status === 'Waiting') {
                               handleStartInterview(c);
                             } else {
+                              const candRounds = getCandidateRounds(c);
+                              const activeR = candRounds.includes(c.currentRound) ? c.currentRound : candRounds[0];
+                              setRound(activeR);
                               setActiveInterviewCandidate(c);
                             }
                           }}
@@ -361,24 +381,29 @@ export default function InterviewerDashboard({ currentUser }) {
               {/* Scorecard Form */}
               <div className="p-6 sm:p-8 space-y-6">
                 
-                {/* Round Selector */}
+                {/* Round Selector (Person-Wise Assigned Rounds) */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Current Evaluation Round
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Round 1: Technical', 'Round 2: Practical', 'Round 3: HR'].map((r) => (
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Current Evaluation Round
+                    </label>
+                    <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      Admin Plan: {getCandidateRounds(activeInterviewCandidate).length} {getCandidateRounds(activeInterviewCandidate).length === 1 ? 'Round' : 'Rounds'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {getCandidateRounds(activeInterviewCandidate).map((r, idx) => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => setRound(r)}
-                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                           round === r 
                             ? 'bg-[#034665] text-white border-[#034665] shadow-xs' 
                             : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        {r}
+                        {idx + 1}. {r}
                       </button>
                     ))}
                   </div>
