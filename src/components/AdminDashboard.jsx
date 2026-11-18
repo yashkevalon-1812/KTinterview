@@ -463,7 +463,6 @@ export default function AdminDashboard({ currentUser }) {
         {/* Footer */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex items-center justify-between">
           <span>Showing <b>{candidates.length}</b> candidates</span>
-          <span className="font-medium">Data saved in MongoDB</span>
         </div>
 
       </div>
