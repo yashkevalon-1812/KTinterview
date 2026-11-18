@@ -101,16 +101,6 @@ export default function AdminDashboard({ currentUser }) {
     return () => clearInterval(interval);
   }, [statusFilter, roleFilter, searchQuery]);
 
-  // Handle Quick Status Change
-  const handleStatusChange = async (candidateId, newStatus) => {
-    try {
-      await api.updateCandidate(candidateId, { status: newStatus });
-      loadData();
-    } catch (err) {
-      alert('Failed to update status');
-    }
-  };
-
   // Helper to toggle a round while keeping canonical order (Theory -> Practical -> HR)
   const toggleRoundInList = (roundId, currentList, setList, onChangeCurrent) => {
     const exists = currentList.includes(roundId);
@@ -895,37 +885,6 @@ export default function AdminDashboard({ currentUser }) {
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Direct Status Override Buttons */}
-            <div className="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-500">Quick Override:</span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => handleStatusChange(selectedCandidate._id, 'Waiting')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800"
-                >
-                  Set Waiting
-                </button>
-                <button
-                  onClick={() => handleStatusChange(selectedCandidate._id, 'Round 1 Passed')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-800"
-                >
-                  Pass R1
-                </button>
-                <button
-                  onClick={() => handleStatusChange(selectedCandidate._id, 'Selected')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800"
-                >
-                  Select / Hire
-                </button>
-                <button
-                  onClick={() => handleStatusChange(selectedCandidate._id, 'Rejected')}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-800"
-                >
-                  Reject
-                </button>
-              </div>
             </div>
 
           </div>
