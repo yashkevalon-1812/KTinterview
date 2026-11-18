@@ -219,19 +219,30 @@ export default function AdminDashboard({ currentUser }) {
 
   // Export CSV
   const exportToCSV = () => {
-    const headers = ['Token', 'Name', 'Phone', 'Email', 'Role', 'Experience', 'Status', 'Current Round', 'Interviewer', 'Expected CTC'];
-    const rows = candidates.map(c => [
-      c.tokenNumber,
-      `"${c.fullName}"`,
-      c.phone,
-      c.email,
-      `"${c.appliedRole}"`,
-      `"${c.experience}"`,
-      c.status,
-      `"${c.currentRound}"`,
-      `"${c.assignedInterviewer}"`,
-      `"${c.expectedCtc}"`
-    ]);
+    const headers = ['Token', 'Name', 'Phone', 'Email', 'Role', 'Category', 'Salary / Internship', 'Status', 'Round', 'Assigned Interviewer', 'Latest Remark'];
+    const rows = candidates.map(c => {
+      const salaryOrIntern = c.candidateType === 'Employee'
+        ? (c.salaryExpectation || 'N/A')
+        : c.candidateType === 'Intern'
+        ? `${c.internshipType || ''} Internship${c.stipendAmount ? ` (${c.stipendAmount})` : ''}`
+        : 'Pending';
+      const latestNote = Array.isArray(c.feedbacks) && c.feedbacks.length > 0
+        ? (c.feedbacks[c.feedbacks.length - 1].notes || '').replace(/"/g, '""')
+        : '';
+      return [
+        c.tokenNumber,
+        `"${c.fullName}"`,
+        c.phone,
+        c.email,
+        `"${c.appliedRole}"`,
+        `"${c.candidateType || 'Pending'}"`,
+        `"${salaryOrIntern}"`,
+        c.status,
+        `"${c.currentRound}"`,
+        `"${c.assignedInterviewer}"`,
+        `"${latestNote}"`
+      ];
+    });
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -279,7 +290,7 @@ export default function AdminDashboard({ currentUser }) {
             Walk-in Interview Command Center
           </h1>
           <p className="text-sky-100 text-sm mt-1 max-w-2xl">
-            Real-time candidate tracking, interviewer room dispatch, live scorecards, and hiring decisions.
+            Real-time candidate tracking, interviewer assignment, live remarks, and hiring decisions.
           </p>
         </div>
 
@@ -302,7 +313,7 @@ export default function AdminDashboard({ currentUser }) {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         
         {/* Total */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:border-[#034665] transition-all">
@@ -331,17 +342,7 @@ export default function AdminDashboard({ currentUser }) {
             <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping"></span>
           </div>
           <div className="text-2xl font-black text-sky-800">{stats?.inInterview ?? 0}</div>
-          <span className="text-[11px] font-medium text-sky-600">Active in rooms</span>
-        </div>
-
-        {/* Round 1 Passed */}
-        <div className="bg-indigo-50/60 p-4 rounded-2xl shadow-sm border border-indigo-200">
-          <div className="flex items-center justify-between text-indigo-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">R1 Cleared</span>
-            <CheckCircle className="w-4 h-4 text-indigo-600" />
-          </div>
-          <div className="text-2xl font-black text-indigo-800">{stats?.round1Passed ?? 0}</div>
-          <span className="text-[11px] font-medium text-indigo-600">Eligible for R2</span>
+          <span className="text-[11px] font-medium text-sky-600">Active interviews</span>
         </div>
 
         {/* Selected / Hired */}
@@ -406,7 +407,7 @@ export default function AdminDashboard({ currentUser }) {
             <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5 mr-2">
               <Filter className="w-3.5 h-3.5 text-[#034665]" /> Status:
             </span>
-            {['All', 'Waiting', 'In-Interview', 'Round 1 Passed', 'Selected', 'Rejected', 'On-Hold'].map((st) => (
+            {['All', 'Waiting', 'In-Interview', 'Selected', 'Rejected', 'On-Hold'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -443,10 +444,10 @@ export default function AdminDashboard({ currentUser }) {
                 <th className="py-3.5 px-4">Token #</th>
                 <th className="py-3.5 px-4">Candidate</th>
                 <th className="py-3.5 px-4">Applied Role</th>
-                <th className="py-3.5 px-4">Exp & Notice</th>
+                <th className="py-3.5 px-4">Type &amp; Salary / Intern</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Room & Round</th>
-                <th className="py-3.5 px-4">Assigned Evaluator</th>
+                <th className="py-3.5 px-4">Round</th>
+                <th className="py-3.5 px-4">Assigned Interviewer</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -483,28 +484,28 @@ export default function AdminDashboard({ currentUser }) {
                       </div>
                     </td>
 
-                    {/* Exp & Notice */}
+                    {/* Type & Salary / Intern */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="font-medium text-slate-700">
-                        {c.candidateType ? (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                            c.candidateType === 'Employee'
-                              ? 'bg-sky-50 text-[#034665] border-sky-200'
-                              : 'bg-indigo-50 text-indigo-800 border-indigo-200'
-                          }`}>
-                            {c.candidateType}
-                          </span>
-                        ) : (
-                          c.experience
-                        )}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        {c.candidateType === 'Employee' && c.salaryExpectation
-                          ? `Exp: ${c.salaryExpectation}`
-                          : c.candidateType === 'Intern' && c.internshipType
-                          ? `${c.internshipType} Internship${c.stipendAmount ? ` (${c.stipendAmount})` : ''}`
-                          : `Notice: ${c.noticePeriod}`}
-                      </div>
+                      {c.candidateType ? (
+                        <>
+                          <div className="font-medium text-slate-700">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                              c.candidateType === 'Employee'
+                                ? 'bg-sky-50 text-[#034665] border-sky-200'
+                                : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                            }`}>
+                              {c.candidateType}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-semibold text-slate-700 mt-1">
+                            {c.candidateType === 'Employee'
+                              ? `Salary: ${c.salaryExpectation || 'N/A'}`
+                              : `${c.internshipType || ''} Internship${c.stipendAmount ? ` (${c.stipendAmount})` : ''}`}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">Pending</span>
+                      )}
                     </td>
 
                     {/* Status Badge */}
@@ -512,10 +513,9 @@ export default function AdminDashboard({ currentUser }) {
                       {getStatusBadge(c.status)}
                     </td>
 
-                    {/* Room & Person-Wise Rounds */}
+                    {/* Person-Wise Round Only */}
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-800">{c.room || 'Lounge'}</div>
-                      <div className="text-[10px] font-semibold text-[#034665]">{c.currentRound}</div>
+                      <div className="font-bold text-[#034665] text-xs">{c.currentRound}</div>
                       <div className="flex flex-wrap items-center gap-1 mt-1">
                         {getCandidateRounds(c).map((roundId) => {
                           const rMeta = ALL_INTERVIEW_ROUNDS.find(r => r.id === roundId);
@@ -536,7 +536,7 @@ export default function AdminDashboard({ currentUser }) {
                       </div>
                     </td>
 
-                    {/* Interviewer */}
+                    {/* Assigned Interviewer */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="font-medium text-slate-700">
                         {c.assignedInterviewer || 'Unassigned'}
@@ -557,7 +557,7 @@ export default function AdminDashboard({ currentUser }) {
                           Rounds ({getCandidateRounds(c).length})
                         </button>
 
-                        {/* Assign Room / Interviewer */}
+                        {/* Assign Interviewer */}
                         <button
                           onClick={() => {
                             const candRounds = getCandidateRounds(c);
@@ -570,16 +570,16 @@ export default function AdminDashboard({ currentUser }) {
                             setAssignInterviewerModal(true);
                           }}
                           className="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-[#034665] font-bold text-xs transition-colors cursor-pointer"
-                          title="Assign to Interviewer & Room"
+                          title="Assign to Interviewer"
                         >
-                          Dispatch
+                          Assign
                         </button>
 
                         {/* Quick View Details */}
                         <button
                           onClick={() => setSelectedCandidate(c)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
-                          title="View Details & Scorecard History"
+                          title="View Details & Interviewer Remarks"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
@@ -600,12 +600,12 @@ export default function AdminDashboard({ currentUser }) {
 
       </div>
 
-      {/* DISPATCH / ASSIGN MODAL */}
+      {/* ASSIGN INTERVIEWER MODAL */}
       {assignInterviewerModal && selectedCandidate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
           <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-scale-up">
             <h3 className="text-lg font-black text-slate-900 brand-font mb-1">
-              Dispatch Candidate to Interview Room
+              Assign Candidate to Interviewer
             </h3>
             <p className="text-xs text-slate-500 mb-4">
               Token: <b>{selectedCandidate.tokenNumber}</b> &bull; {selectedCandidate.fullName} ({selectedCandidate.appliedRole})
@@ -623,8 +623,6 @@ export default function AdminDashboard({ currentUser }) {
                     setTargetInterviewer(e.target.value);
                     if (chosen && chosen.room) {
                       setTargetRoom(chosen.room);
-                    } else if (e.target.value) {
-                      setTargetRoom('Room 1 - Tech Round');
                     }
                   }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -634,7 +632,7 @@ export default function AdminDashboard({ currentUser }) {
                   </option>
                   {interviewers.map((int) => (
                     <option key={int._id || int.id || int.email} value={int.name}>
-                      {int.name} ({int.designation || 'Interviewer'}) &bull; {int.room || 'Room 1'}
+                      {int.name} ({int.designation || 'Interviewer'})
                     </option>
                   ))}
                 </select>
@@ -674,9 +672,9 @@ export default function AdminDashboard({ currentUser }) {
                   })}
                 </div>
 
-                {/* Active Round to Dispatch */}
+                {/* Active Round to Assign */}
                 <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 mt-2">
-                  Dispatch For Round
+                  Assign For Round
                 </label>
                 <select
                   value={targetCurrentRound}
@@ -694,35 +692,24 @@ export default function AdminDashboard({ currentUser }) {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Interview Room</label>
-                <input
-                  type="text"
-                  value={targetRoom}
-                  onChange={(e) => setTargetRoom(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800"
-                  placeholder="e.g. Room 1 - Tech Round"
-                />
-              </div>
-
               <div className="p-3 rounded-xl bg-sky-50 text-[#034665] text-xs">
-                💡 Assigning will automatically change status to <b>In-Interview</b> and notify the Lobby TV Screen.
+                💡 Assigning will automatically set status to <b>In-Interview</b> and display this candidate in the selected interviewer&apos;s panel.
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setAssignInterviewerModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={interviewers.length === 0 || !targetInterviewer}
-                  className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Confirm Dispatch
+                  Confirm Assign
                 </button>
               </div>
             </form>
@@ -760,16 +747,26 @@ export default function AdminDashboard({ currentUser }) {
                 <div className="mt-1">{getStatusBadge(selectedCandidate.status)}</div>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Current CTC</span>
-                <div className="font-bold text-slate-800 text-sm mt-1">{selectedCandidate.currentCtc || 'N/A'}</div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Category</span>
+                <div className="font-bold text-[#034665] text-sm mt-1">
+                  {selectedCandidate.candidateType || 'Pending'}
+                </div>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Expected CTC</span>
-                <div className="font-bold text-emerald-700 text-sm mt-1">{selectedCandidate.expectedCtc || 'N/A'}</div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">
+                  {selectedCandidate.candidateType === 'Intern' ? 'Internship Type' : 'Salary Expectation'}
+                </span>
+                <div className="font-bold text-emerald-700 text-sm mt-1">
+                  {selectedCandidate.candidateType === 'Employee'
+                    ? (selectedCandidate.salaryExpectation || 'N/A')
+                    : selectedCandidate.candidateType === 'Intern'
+                    ? `${selectedCandidate.internshipType || ''} Internship${selectedCandidate.stipendAmount ? ` (${selectedCandidate.stipendAmount})` : ''}`
+                    : 'Not Recorded'}
+                </div>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Notice Period</span>
-                <div className="font-bold text-slate-800 text-sm mt-1">{selectedCandidate.noticePeriod}</div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Current Round</span>
+                <div className="font-bold text-slate-800 text-sm mt-1">{selectedCandidate.currentRound || 'Theory Round'}</div>
               </div>
             </div>
 
@@ -780,8 +777,8 @@ export default function AdminDashboard({ currentUser }) {
                 <span className="font-medium text-slate-800">{selectedCandidate.phone} | {selectedCandidate.email}</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                <span className="text-slate-500 font-semibold">Assigned Evaluator & Room:</span>
-                <span className="font-medium text-slate-800">{selectedCandidate.assignedInterviewer} ({selectedCandidate.room})</span>
+                <span className="text-slate-500 font-semibold">Assigned Interviewer:</span>
+                <span className="font-medium text-slate-800">{selectedCandidate.assignedInterviewer || 'Unassigned'}</span>
               </div>
               {selectedCandidate.candidateType && (
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
@@ -820,7 +817,7 @@ export default function AdminDashboard({ currentUser }) {
               {selectedCandidate.resumeLink && (
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-sky-50 text-[#034665]">
                   <span className="font-semibold">Candidate Resume:</span>
-                  <a href={selectedCandidate.resumeLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-bold underline">
+                  <a href={api.getFileUrl(selectedCandidate.resumeLink)} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-bold underline">
                     Open Resume Document <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -835,7 +832,7 @@ export default function AdminDashboard({ currentUser }) {
 
               {(!selectedCandidate.feedbacks || selectedCandidate.feedbacks.length === 0) ? (
                 <div className="p-4 rounded-xl bg-slate-50 text-center text-slate-400 text-xs">
-                  No interview feedback recorded yet. Candidate is pending interview round.
+                  No interview remark recorded yet. Candidate is pending interview round.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -856,30 +853,34 @@ export default function AdminDashboard({ currentUser }) {
                         </span>
                       </div>
 
-                      {/* Ratings (only show if recorded) */}
-                      {(fb.technicalRating > 0 || fb.problemSolvingRating > 0 || fb.communicationRating > 0 || fb.experienceMatchRating > 0) && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
-                          <div>Tech: <b>{fb.technicalRating}/5 ⭐</b></div>
-                          <div>Problem Solving: <b>{fb.problemSolvingRating}/5 ⭐</b></div>
-                          <div>Comm: <b>{fb.communicationRating}/5 ⭐</b></div>
-                          <div>Exp Fit: <b>{fb.experienceMatchRating}/5 ⭐</b></div>
-                        </div>
-                      )}
-
-                      {/* Employee / Intern Details in Feedback Log */}
+                      {/* Employee / Intern & Salary / Internship Details */}
                       {fb.candidateType && (
-                        <div className="text-[11px] font-semibold text-[#034665] bg-sky-50/80 border border-sky-200 px-2.5 py-1 rounded-lg inline-block">
-                          {fb.candidateType === 'Employee'
-                            ? `Employee • Salary Expectation: ${fb.salaryExpectation || 'N/A'}`
-                            : `Intern • ${fb.internshipType || ''} Internship${fb.stipendAmount ? ` (${fb.stipendAmount})` : ''}`}
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                          <span className={`px-2.5 py-1 rounded-lg border ${
+                            fb.candidateType === 'Employee'
+                              ? 'bg-sky-50 text-[#034665] border-sky-200'
+                              : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                          }`}>
+                            Category: {fb.candidateType}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {fb.candidateType === 'Employee'
+                              ? `Salary Expectation: ${fb.salaryExpectation || 'N/A'}`
+                              : `${fb.internshipType || ''} Internship${fb.stipendAmount ? ` (Stipend: ${fb.stipendAmount})` : ''}`}
+                          </span>
                         </div>
                       )}
 
-                      {/* Notes */}
+                      {/* Interviewer Remark */}
                       {fb.notes && (
-                        <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 italic">
-                          "{fb.notes}"
-                        </p>
+                        <div className="bg-white p-3 rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                            Interviewer Remark
+                          </span>
+                          <p className="text-xs text-slate-700 italic">
+                            &quot;{fb.notes}&quot;
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}
