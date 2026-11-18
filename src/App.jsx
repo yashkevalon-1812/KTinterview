@@ -7,45 +7,64 @@ import InterviewerDashboard from './components/InterviewerDashboard';
 import CandidateDashboard from './components/CandidateDashboard';
 
 export default function App() {
-  // Keep user session strictly in memory (no localStorage/sessionStorage persistence)
-  // so leaving the site, closing the tab/browser, or navigating away auto-logs out.
-  const [currentUser, setCurrentUser] = useState(null);
+  // Store active user in sessionStorage (NOT localStorage):
+  // - Page refresh (F5 / Reload) keeps the user logged in.
+  // - Closing the tab/browser, opening a new tab, or navigating away & returning auto-logs out.
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      // Remove any legacy localStorage session
+      localStorage.removeItem('kevalon_current_user');
+
+      // If user navigated away to another website and returned via Back/Forward, force logout
+      const navEntries = typeof performance !== 'undefined' && performance.getEntriesByType
+        ? performance.getEntriesByType('navigation')
+        : [];
+      const navType = navEntries[0]?.type;
+      if (navType === 'back_forward') {
+        sessionStorage.removeItem('kevalon_current_user');
+        return null;
+      }
+
+      const saved = sessionStorage.getItem('kevalon_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Clear any old saved session and auto-logout whenever the user exits/leaves the page
+  // Sync currentUser with sessionStorage (auto-clears when tab/browser is closed)
   useEffect(() => {
-    const clearStoredSession = () => {
-      try {
-        localStorage.removeItem('kevalon_current_user');
+    try {
+      if (currentUser) {
+        sessionStorage.setItem('kevalon_current_user', JSON.stringify(currentUser));
+      } else {
         sessionStorage.removeItem('kevalon_current_user');
-      } catch {
-        // Ignore storage access errors
       }
-    };
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [currentUser]);
 
-    clearStoredSession();
-
-    const handleExitLogout = () => {
-      clearStoredSession();
-      setCurrentUser(null);
-      setAuthView('login');
-    };
-
+  // If browser restores the page from back/forward cache (bfcache) after leaving the site, log out
+  useEffect(() => {
     const handlePageShow = (event) => {
-      // If browser restores the page from back/forward cache (bfcache), force logout
       if (event.persisted) {
-        handleExitLogout();
+        try {
+          localStorage.removeItem('kevalon_current_user');
+          sessionStorage.removeItem('kevalon_current_user');
+        } catch {
+          // Ignore storage access errors
+        }
+        setCurrentUser(null);
+        setAuthView('login');
       }
     };
 
-    window.addEventListener('pagehide', handleExitLogout);
-    window.addEventListener('beforeunload', handleExitLogout);
     window.addEventListener('pageshow', handlePageShow);
-
     return () => {
-      window.removeEventListener('pagehide', handleExitLogout);
-      window.removeEventListener('beforeunload', handleExitLogout);
       window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
