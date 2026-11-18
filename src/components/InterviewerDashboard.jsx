@@ -8,7 +8,13 @@ import {
   Mail,
   Building,
   Layers,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  Send,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -26,6 +32,15 @@ export default function InterviewerDashboard({ currentUser }) {
   const [assignedCandidates, setAssignedCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Evaluation (Remark + Pass/Fail) modal state
+  const [evaluatingCandidate, setEvaluatingCandidate] = useState(null);
+  const [evalRound, setEvalRound] = useState('Theory Round');
+  const [evalResult, setEvalResult] = useState(''); // 'Pass' | 'Fail'
+  const [remark, setRemark] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [toastMsg, setToastMsg] = useState('');
 
   const interviewerName = (currentUser?.name || '').trim();
   const interviewerEmail = (currentUser?.email || '').toLowerCase().trim();
@@ -65,7 +80,6 @@ export default function InterviewerDashboard({ currentUser }) {
           interviewerEmail: interviewerEmail
         });
         if (res.success && Array.isArray(res.candidates)) {
-          // Double-filter client side to guarantee zero leakage of unassigned or other interviewers' candidates
           const mineOnly = res.candidates.filter(isAssignedToMe);
           setAssignedCandidates(mineOnly);
         }
@@ -85,6 +99,80 @@ export default function InterviewerDashboard({ currentUser }) {
     return () => clearInterval(interval);
   }, [loadAssignedCandidates]);
 
+  // Open evaluation modal for a candidate
+  const openEvaluateModal = (candidate) => {
+    const candRounds = getCandidateRounds(candidate);
+    const activeR = candRounds.includes(candidate.currentRound)
+      ? candidate.currentRound
+      : candRounds[0];
+    setEvaluatingCandidate(candidate);
+    setEvalRound(activeR);
+    setEvalResult('');
+    setRemark('');
+    setModalError('');
+  };
+
+  // Submit Remark + Pass / Fail result
+  const handleSubmitResult = async (e) => {
+    e.preventDefault();
+    if (!evaluatingCandidate) return;
+
+    if (!evalResult) {
+      setModalError('Please select Pass or Fail.');
+      return;
+    }
+    if (!remark.trim()) {
+      setModalError('Please enter your interview remark.');
+      return;
+    }
+
+    setSubmitting(true);
+    setModalError('');
+
+    try {
+      const payload = {
+        interviewerName: interviewerName || 'Interviewer',
+        round: evalRound,
+        decision: evalResult === 'Pass' ? 'Advance' : 'Reject',
+        notes: remark.trim()
+      };
+
+      const res = await api.submitFeedback(
+        evaluatingCandidate._id || evaluatingCandidate.tokenNumber,
+        payload
+      );
+
+      if (res.success) {
+        const verdictLabel = evalResult === 'Pass' ? 'PASSED' : 'FAILED';
+        setToastMsg(
+          `Result saved for ${evaluatingCandidate.fullName} (${evaluatingCandidate.tokenNumber}) — Marked as ${verdictLabel}.`
+        );
+        setTimeout(() => setToastMsg(''), 5000);
+        setEvaluatingCandidate(null);
+        setRemark('');
+        setEvalResult('');
+        loadAssignedCandidates(false);
+      } else {
+        setModalError(res.message || 'Failed to save interview result.');
+      }
+    } catch (err) {
+      setModalError('Server connection error. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Determine what happens when Pass is selected for the currently open candidate/round
+  const getPassOutcomeHint = () => {
+    if (!evaluatingCandidate) return '';
+    const candRounds = getCandidateRounds(evaluatingCandidate);
+    const idx = candRounds.indexOf(evalRound);
+    if (idx !== -1 && idx < candRounds.length - 1) {
+      return `Clears ${evalRound} → Moves to ${candRounds[idx + 1]}`;
+    }
+    return `Final round cleared → Marks candidate as PASSED (Selected)`;
+  };
+
   return (
     <div className="w-full px-4 sm:px-6 lg:px-10 py-6 space-y-6">
       {/* Header */}
@@ -97,7 +185,7 @@ export default function InterviewerDashboard({ currentUser }) {
             Welcome, {interviewerName || 'Interviewer'}
           </h1>
           <p className="text-xs sm:text-sm text-sky-100/90 mt-1">
-            Only candidates assigned to you by Admin are listed below.
+            Only candidates assigned to you by Admin are listed below. Add remarks and submit Pass / Fail after each interview.
           </p>
         </div>
 
@@ -116,6 +204,23 @@ export default function InterviewerDashboard({ currentUser }) {
           </button>
         </div>
       </div>
+
+      {/* Success Toast */}
+      {toastMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{toastMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMsg('')}
+            className="p-1 rounded-lg hover:bg-emerald-100 text-emerald-700 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Assigned Candidates Section */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-6">
@@ -151,9 +256,15 @@ export default function InterviewerDashboard({ currentUser }) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {assignedCandidates.map((c) => {
               const candRounds = getCandidateRounds(c);
+              const isCompleted = c.status === 'Selected' || c.status === 'Rejected';
+              const lastFeedback =
+                Array.isArray(c.feedbacks) && c.feedbacks.length > 0
+                  ? c.feedbacks[c.feedbacks.length - 1]
+                  : null;
+
               return (
                 <div
                   key={c._id || c.tokenNumber}
@@ -178,16 +289,22 @@ export default function InterviewerDashboard({ currentUser }) {
 
                       <span
                         className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 border ${
-                          c.status === 'In-Interview'
-                            ? 'bg-sky-100 text-sky-800 border-sky-200'
-                            : c.status === 'Selected'
+                          c.status === 'Selected'
                             ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                             : c.status === 'Rejected'
                             ? 'bg-rose-100 text-rose-800 border-rose-200'
+                            : c.status === 'Round 1 Passed' || c.status === 'Round 2 Passed'
+                            ? 'bg-teal-100 text-teal-800 border-teal-200'
+                            : c.status === 'In-Interview'
+                            ? 'bg-sky-100 text-sky-800 border-sky-200'
                             : 'bg-amber-100 text-amber-800 border-amber-200'
                         }`}
                       >
-                        {c.status}
+                        {c.status === 'Selected'
+                          ? 'PASSED'
+                          : c.status === 'Rejected'
+                          ? 'FAILED'
+                          : c.status}
                       </span>
                     </div>
 
@@ -234,27 +351,65 @@ export default function InterviewerDashboard({ currentUser }) {
                         ))}
                       </div>
                     </div>
+
+                    {/* Latest Remark Preview if recorded */}
+                    {lastFeedback && (
+                      <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold text-slate-500 uppercase">
+                            Last Remark ({lastFeedback.round})
+                          </span>
+                          <span
+                            className={`font-black px-1.5 py-0.5 rounded ${
+                              lastFeedback.decision === 'Reject'
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}
+                          >
+                            {lastFeedback.decision === 'Reject' ? 'FAILED' : 'PASSED'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-700 italic line-clamp-2">
+                          "{lastFeedback.notes}"
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Footer: Room & CV Link */}
-                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 text-xs">
-                    <span className="text-[11px] font-semibold text-slate-500 truncate">
-                      Room: <b className="text-slate-800">{c.room || 'Room 1'}</b>
-                    </span>
+                  {/* Footer Actions: Room, View CV & Remark / Pass-Fail Button */}
+                  <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-[11px] font-semibold text-slate-500 truncate">
+                        Room: <b className="text-slate-800">{c.room || 'Room 1'}</b>
+                      </span>
 
-                    {c.resumeLink ? (
-                      <a
-                        href={api.getFileUrl(c.resumeLink)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#034665] hover:bg-[#022a3d] text-white text-[11px] font-bold transition-colors shrink-0"
-                      >
-                        <FileText className="w-3.5 h-3.5" /> View CV
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-[11px] text-slate-400">No CV</span>
-                    )}
+                      {c.resumeLink ? (
+                        <a
+                          href={api.getFileUrl(c.resumeLink)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#034665] border border-sky-200 text-[11px] font-bold transition-colors shrink-0"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> View CV
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">No CV</span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openEvaluateModal(c)}
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
+                        isCompleted
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                          : 'bg-[#034665] hover:bg-[#022a3d] text-white shadow-md'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {isCompleted ? 'Update Remark / Result' : 'Add Remark & Pass / Fail'}
+                    </button>
                   </div>
                 </div>
               );
@@ -262,6 +417,197 @@ export default function InterviewerDashboard({ currentUser }) {
           </div>
         )}
       </div>
+
+      {/* REMARK & PASS / FAIL MODAL */}
+      {evaluatingCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+            {/* Modal Header */}
+            <div className="bg-[#034665] px-6 py-5 text-white flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="font-mono font-black text-base px-3 py-1 rounded-xl bg-white/20 border border-white/25 shrink-0">
+                  {evaluatingCandidate.tokenNumber}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-black brand-font truncate">
+                    {evaluatingCandidate.fullName}
+                  </h3>
+                  <p className="text-xs text-sky-200 truncate">
+                    {evaluatingCandidate.domain || evaluatingCandidate.appliedRole}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEvaluatingCandidate(null)}
+                className="p-1.5 rounded-xl text-sky-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitResult} className="p-6 space-y-5">
+              {modalError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
+              {/* Round Selection (Person-Wise Assigned Rounds) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Interview Round
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {getCandidateRounds(evaluatingCandidate).map((r, idx) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setEvalRound(r)}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        evalRound === r
+                          ? 'bg-[#034665] text-white border-[#034665] shadow-xs'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {idx + 1}. {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pass / Fail Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Interview Result (Pass / Fail) <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEvalResult('Pass');
+                      setModalError('');
+                    }}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      evalResult === 'Pass'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.01]'
+                        : 'bg-emerald-50/60 text-emerald-800 border-emerald-200 hover:border-emerald-400'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-7 h-7" />
+                    <span className="text-sm font-black tracking-wide">PASS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEvalResult('Fail');
+                      setModalError('');
+                    }}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      evalResult === 'Fail'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-lg scale-[1.01]'
+                        : 'bg-rose-50/60 text-rose-800 border-rose-200 hover:border-rose-400'
+                    }`}
+                  >
+                    <XCircle className="w-7 h-7" />
+                    <span className="text-sm font-black tracking-wide">FAIL</span>
+                  </button>
+                </div>
+
+                {evalResult && (
+                  <p
+                    className={`text-[11px] font-semibold mt-2 px-3 py-1.5 rounded-lg border ${
+                      evalResult === 'Pass'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}
+                  >
+                    {evalResult === 'Pass'
+                      ? getPassOutcomeHint()
+                      : 'Marks candidate as FAILED (Rejected) and completes evaluation.'}
+                  </p>
+                )}
+              </div>
+
+              {/* Remark Field */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Interviewer Remark <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={remark}
+                  onChange={(e) => {
+                    setRemark(e.target.value);
+                    if (modalError) setModalError('');
+                  }}
+                  placeholder="Write your interview remarks, candidate performance, technical/practical notes, or reason for Pass/Fail..."
+                  className="w-full p-3.5 rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800 resize-none"
+                />
+              </div>
+
+              {/* Previous Remarks (if any) */}
+              {Array.isArray(evaluatingCandidate.feedbacks) &&
+                evaluatingCandidate.feedbacks.length > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 max-h-32 overflow-y-auto">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                      Previous Remarks ({evaluatingCandidate.feedbacks.length})
+                    </span>
+                    {evaluatingCandidate.feedbacks.map((fb, i) => (
+                      <div
+                        key={i}
+                        className="text-xs text-slate-700 pb-1.5 border-b border-slate-200/70 last:border-none last:pb-0"
+                      >
+                        <div className="flex items-center justify-between font-bold text-[11px]">
+                          <span>
+                            {fb.round} &bull; {fb.interviewerName}
+                          </span>
+                          <span
+                            className={
+                              fb.decision === 'Reject' ? 'text-rose-600' : 'text-emerald-600'
+                            }
+                          >
+                            {fb.decision === 'Reject' ? 'FAILED' : 'PASSED'}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 italic mt-0.5">"{fb.notes}"</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEvaluatingCandidate(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50 ${
+                    evalResult === 'Fail'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : evalResult === 'Pass'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-[#034665] hover:bg-[#022a3d]'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {submitting ? 'Saving Result...' : 'Submit Remark & Result'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

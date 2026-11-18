@@ -825,18 +825,26 @@ export default function AdminDashboard({ currentUser }) {
                         <span className="font-bold text-slate-800 text-xs">
                           {fb.round} &bull; <span className="text-[#034665]">{fb.interviewerName}</span>
                         </span>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white border border-slate-300 text-slate-700">
-                          Decision: {fb.decision}
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                          fb.decision === 'Reject'
+                            ? 'bg-rose-50 border-rose-300 text-rose-700'
+                            : fb.decision === 'Select' || fb.decision === 'Advance'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                            : 'bg-white border-slate-300 text-slate-700'
+                        }`}>
+                          {fb.decision === 'Reject' ? 'FAILED' : fb.decision === 'Select' || fb.decision === 'Advance' ? 'PASSED' : fb.decision}
                         </span>
                       </div>
 
-                      {/* Ratings */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
-                        <div>Tech: <b>{fb.technicalRating}/5 ⭐</b></div>
-                        <div>Problem Solving: <b>{fb.problemSolvingRating}/5 ⭐</b></div>
-                        <div>Comm: <b>{fb.communicationRating}/5 ⭐</b></div>
-                        <div>Exp Fit: <b>{fb.experienceMatchRating}/5 ⭐</b></div>
-                      </div>
+                      {/* Ratings (only show if recorded) */}
+                      {(fb.technicalRating > 0 || fb.problemSolvingRating > 0 || fb.communicationRating > 0 || fb.experienceMatchRating > 0) && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                          <div>Tech: <b>{fb.technicalRating}/5 ⭐</b></div>
+                          <div>Problem Solving: <b>{fb.problemSolvingRating}/5 ⭐</b></div>
+                          <div>Comm: <b>{fb.communicationRating}/5 ⭐</b></div>
+                          <div>Exp Fit: <b>{fb.experienceMatchRating}/5 ⭐</b></div>
+                        </div>
+                      )}
 
                       {/* Notes */}
                       {fb.notes && (
