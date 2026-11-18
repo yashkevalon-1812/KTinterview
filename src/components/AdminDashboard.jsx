@@ -495,8 +495,26 @@ export default function AdminDashboard({ currentUser }) {
 
                     {/* Exp & Notice */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="font-medium text-slate-700">{c.experience}</div>
-                      <div className="text-[10px] text-slate-500">Notice: {c.noticePeriod}</div>
+                      <div className="font-medium text-slate-700">
+                        {c.candidateType ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            c.candidateType === 'Employee'
+                              ? 'bg-sky-50 text-[#034665] border-sky-200'
+                              : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                          }`}>
+                            {c.candidateType}
+                          </span>
+                        ) : (
+                          c.experience
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {c.candidateType === 'Employee' && c.salaryExpectation
+                          ? `Exp: ${c.salaryExpectation}`
+                          : c.candidateType === 'Intern' && c.internshipType
+                          ? `${c.internshipType} Internship${c.stipendAmount ? ` (${c.stipendAmount})` : ''}`
+                          : `Notice: ${c.noticePeriod}`}
+                      </div>
                     </td>
 
                     {/* Status Badge */}
@@ -775,6 +793,18 @@ export default function AdminDashboard({ currentUser }) {
                 <span className="text-slate-500 font-semibold">Assigned Evaluator & Room:</span>
                 <span className="font-medium text-slate-800">{selectedCandidate.assignedInterviewer} ({selectedCandidate.room})</span>
               </div>
+              {selectedCandidate.candidateType && (
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                  <span className="text-emerald-900 font-bold">
+                    Category: {selectedCandidate.candidateType}
+                  </span>
+                  <span className="font-bold text-emerald-800">
+                    {selectedCandidate.candidateType === 'Employee'
+                      ? `Salary Expectation: ${selectedCandidate.salaryExpectation || 'N/A'}`
+                      : `${selectedCandidate.internshipType || ''} Internship${selectedCandidate.stipendAmount ? ` (${selectedCandidate.stipendAmount})` : ''}`}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200">
                 <div>
                   <span className="text-indigo-900 font-bold block">Assigned Interview Rounds ({getCandidateRounds(selectedCandidate).length}):</span>
@@ -843,6 +873,15 @@ export default function AdminDashboard({ currentUser }) {
                           <div>Problem Solving: <b>{fb.problemSolvingRating}/5 ⭐</b></div>
                           <div>Comm: <b>{fb.communicationRating}/5 ⭐</b></div>
                           <div>Exp Fit: <b>{fb.experienceMatchRating}/5 ⭐</b></div>
+                        </div>
+                      )}
+
+                      {/* Employee / Intern Details in Feedback Log */}
+                      {fb.candidateType && (
+                        <div className="text-[11px] font-semibold text-[#034665] bg-sky-50/80 border border-sky-200 px-2.5 py-1 rounded-lg inline-block">
+                          {fb.candidateType === 'Employee'
+                            ? `Employee • Salary Expectation: ${fb.salaryExpectation || 'N/A'}`
+                            : `Intern • ${fb.internshipType || ''} Internship${fb.stipendAmount ? ` (${fb.stipendAmount})` : ''}`}
                         </div>
                       )}
 

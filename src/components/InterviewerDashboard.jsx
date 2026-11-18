@@ -14,7 +14,10 @@ import {
   MessageSquare,
   Send,
   X,
-  AlertCircle
+  AlertCircle,
+  Briefcase,
+  GraduationCap,
+  IndianRupee
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -28,14 +31,39 @@ const getCandidateRounds = (cand) => {
   return ALL_ROUNDS;
 };
 
+const formatEmploymentSummary = (obj) => {
+  if (!obj?.candidateType) return '';
+  if (obj.candidateType === 'Employee') {
+    return obj.salaryExpectation
+      ? `Employee • Expected Salary: ${obj.salaryExpectation}`
+      : 'Employee';
+  }
+  if (obj.candidateType === 'Intern') {
+    if (obj.internshipType === 'Paid') {
+      return obj.stipendAmount
+        ? `Intern • Paid Internship (${obj.stipendAmount})`
+        : 'Intern • Paid Internship';
+    }
+    if (obj.internshipType === 'Unpaid') {
+      return 'Intern • Unpaid Internship';
+    }
+    return 'Intern';
+  }
+  return '';
+};
+
 export default function InterviewerDashboard({ currentUser }) {
   const [assignedCandidates, setAssignedCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Evaluation (Remark + Pass/Fail) modal state
+  // Evaluation (Employee/Intern + Salary/Paid-Unpaid + Remark + Pass/Fail) modal state
   const [evaluatingCandidate, setEvaluatingCandidate] = useState(null);
   const [evalRound, setEvalRound] = useState('Theory Round');
+  const [candidateType, setCandidateType] = useState(''); // 'Employee' | 'Intern'
+  const [salaryExpectation, setSalaryExpectation] = useState('');
+  const [internshipType, setInternshipType] = useState(''); // 'Paid' | 'Unpaid'
+  const [stipendAmount, setStipendAmount] = useState('');
   const [evalResult, setEvalResult] = useState(''); // 'Pass' | 'Fail'
   const [remark, setRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -99,7 +127,7 @@ export default function InterviewerDashboard({ currentUser }) {
     return () => clearInterval(interval);
   }, [loadAssignedCandidates]);
 
-  // Open evaluation modal for a candidate
+  // Open evaluation modal for a candidate (pre-fill existing type/salary/internship if recorded)
   const openEvaluateModal = (candidate) => {
     const candRounds = getCandidateRounds(candidate);
     const activeR = candRounds.includes(candidate.currentRound)
@@ -107,16 +135,32 @@ export default function InterviewerDashboard({ currentUser }) {
       : candRounds[0];
     setEvaluatingCandidate(candidate);
     setEvalRound(activeR);
+    setCandidateType(candidate.candidateType || '');
+    setSalaryExpectation(candidate.salaryExpectation || '');
+    setInternshipType(candidate.internshipType || '');
+    setStipendAmount(candidate.stipendAmount || '');
     setEvalResult('');
     setRemark('');
     setModalError('');
   };
 
-  // Submit Remark + Pass / Fail result
+  // Submit Candidate Type + Salary/Internship + Remark + Pass / Fail result
   const handleSubmitResult = async (e) => {
     e.preventDefault();
     if (!evaluatingCandidate) return;
 
+    if (!candidateType) {
+      setModalError('Please select whether the candidate is an Employee or an Intern.');
+      return;
+    }
+    if (candidateType === 'Employee' && !salaryExpectation.trim()) {
+      setModalError('Please enter the Employee salary expectation.');
+      return;
+    }
+    if (candidateType === 'Intern' && !internshipType) {
+      setModalError('Please select Paid Internship or Unpaid Internship.');
+      return;
+    }
     if (!evalResult) {
       setModalError('Please select Pass or Fail.');
       return;
@@ -134,7 +178,12 @@ export default function InterviewerDashboard({ currentUser }) {
         interviewerName: interviewerName || 'Interviewer',
         round: evalRound,
         decision: evalResult === 'Pass' ? 'Advance' : 'Reject',
-        notes: remark.trim()
+        notes: remark.trim(),
+        candidateType,
+        salaryExpectation: candidateType === 'Employee' ? salaryExpectation.trim() : '',
+        internshipType: candidateType === 'Intern' ? internshipType : '',
+        stipendAmount:
+          candidateType === 'Intern' && internshipType === 'Paid' ? stipendAmount.trim() : ''
       };
 
       const res = await api.submitFeedback(
@@ -185,7 +234,7 @@ export default function InterviewerDashboard({ currentUser }) {
             Welcome, {interviewerName || 'Interviewer'}
           </h1>
           <p className="text-xs sm:text-sm text-sky-100/90 mt-1">
-            Only candidates assigned to you by Admin are listed below. Add remarks and submit Pass / Fail after each interview.
+            Only candidates assigned to you by Admin are listed below. Record Employee/Intern details, remarks, and Pass / Fail after each interview.
           </p>
         </div>
 
@@ -264,6 +313,7 @@ export default function InterviewerDashboard({ currentUser }) {
                 Array.isArray(c.feedbacks) && c.feedbacks.length > 0
                   ? c.feedbacks[c.feedbacks.length - 1]
                   : null;
+              const employmentInfo = formatEmploymentSummary(c);
 
               return (
                 <div
@@ -325,6 +375,24 @@ export default function InterviewerDashboard({ currentUser }) {
                         <span className="truncate">{c.email || 'N/A'}</span>
                       </div>
                     </div>
+
+                    {/* Employee / Intern Summary Pill if recorded */}
+                    {employmentInfo && (
+                      <div
+                        className={`px-3 py-2 rounded-xl border text-[11px] font-bold flex items-center gap-2 ${
+                          c.candidateType === 'Employee'
+                            ? 'bg-sky-50 text-[#034665] border-sky-200'
+                            : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                        }`}
+                      >
+                        {c.candidateType === 'Employee' ? (
+                          <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span className="truncate">{employmentInfo}</span>
+                      </div>
+                    )}
 
                     {/* Assigned Rounds & Current Round */}
                     <div className="space-y-1.5">
@@ -418,12 +486,12 @@ export default function InterviewerDashboard({ currentUser }) {
         )}
       </div>
 
-      {/* REMARK & PASS / FAIL MODAL */}
+      {/* REMARK, EMPLOYEE/INTERN & PASS / FAIL MODAL */}
       {evaluatingCandidate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
             {/* Modal Header */}
-            <div className="bg-[#034665] px-6 py-5 text-white flex items-start justify-between gap-3">
+            <div className="bg-[#034665] px-6 py-4 text-white flex items-start justify-between gap-3 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <span className="font-mono font-black text-base px-3 py-1 rounded-xl bg-white/20 border border-white/25 shrink-0">
                   {evaluatingCandidate.tokenNumber}
@@ -447,7 +515,7 @@ export default function InterviewerDashboard({ currentUser }) {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmitResult} className="p-6 space-y-5">
+            <form onSubmit={handleSubmitResult} className="p-6 space-y-5 overflow-y-auto">
               {modalError && (
                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -455,7 +523,7 @@ export default function InterviewerDashboard({ currentUser }) {
                 </div>
               )}
 
-              {/* Round Selection (Person-Wise Assigned Rounds) */}
+              {/* 1. Round Selection (Person-Wise Assigned Rounds) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                   Interview Round
@@ -478,7 +546,133 @@ export default function InterviewerDashboard({ currentUser }) {
                 </div>
               </div>
 
-              {/* Pass / Fail Selector */}
+              {/* 2. Candidate Type: Employee or Intern */}
+              <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Candidate Category <span className="text-rose-500">*</span>
+                </label>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCandidateType('Employee');
+                      setInternshipType('');
+                      setStipendAmount('');
+                      setModalError('');
+                    }}
+                    className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+                      candidateType === 'Employee'
+                        ? 'bg-[#034665] text-white border-[#034665] shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-[#034665]/50'
+                    }`}
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    <span>Employee</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCandidateType('Intern');
+                      setSalaryExpectation('');
+                      setModalError('');
+                    }}
+                    className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+                      candidateType === 'Intern'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                    <span>Intern</span>
+                  </button>
+                </div>
+
+                {/* Conditional Field for Employee: Salary Expectation */}
+                {candidateType === 'Employee' && (
+                  <div className="pt-1">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Salary Expectation <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <IndianRupee className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={salaryExpectation}
+                        onChange={(e) => {
+                          setSalaryExpectation(e.target.value);
+                          if (modalError) setModalError('');
+                        }}
+                        placeholder="e.g. 25,000 / month or 4.5 LPA"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#034665] text-xs sm:text-sm text-slate-800"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Conditional Field for Intern: Paid or Unpaid Internship */}
+                {candidateType === 'Intern' && (
+                  <div className="pt-1 space-y-2.5">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Internship Type <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInternshipType('Paid');
+                          setModalError('');
+                        }}
+                        className={`py-2.5 px-3 rounded-xl border-2 text-xs font-bold transition-all cursor-pointer ${
+                          internshipType === 'Paid'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-400'
+                        }`}
+                      >
+                        Paid Internship
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInternshipType('Unpaid');
+                          setStipendAmount('');
+                          setModalError('');
+                        }}
+                        className={`py-2.5 px-3 rounded-xl border-2 text-xs font-bold transition-all cursor-pointer ${
+                          internshipType === 'Unpaid'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-400'
+                        }`}
+                      >
+                        Unpaid Internship
+                      </button>
+                    </div>
+
+                    {internshipType === 'Paid' && (
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                          Stipend Amount (Optional)
+                        </label>
+                        <div className="relative">
+                          <IndianRupee className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={stipendAmount}
+                            onChange={(e) => setStipendAmount(e.target.value)}
+                            placeholder="e.g. 8,000 / month"
+                            className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 text-xs text-slate-800"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Pass / Fail Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                   Interview Result (Pass / Fail) <span className="text-rose-500">*</span>
@@ -490,13 +684,13 @@ export default function InterviewerDashboard({ currentUser }) {
                       setEvalResult('Pass');
                       setModalError('');
                     }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                       evalResult === 'Pass'
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg scale-[1.01]'
                         : 'bg-emerald-50/60 text-emerald-800 border-emerald-200 hover:border-emerald-400'
                     }`}
                   >
-                    <CheckCircle2 className="w-7 h-7" />
+                    <CheckCircle2 className="w-6 h-6" />
                     <span className="text-sm font-black tracking-wide">PASS</span>
                   </button>
 
@@ -506,13 +700,13 @@ export default function InterviewerDashboard({ currentUser }) {
                       setEvalResult('Fail');
                       setModalError('');
                     }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`p-3.5 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                       evalResult === 'Fail'
                         ? 'bg-rose-600 text-white border-rose-600 shadow-lg scale-[1.01]'
                         : 'bg-rose-50/60 text-rose-800 border-rose-200 hover:border-rose-400'
                     }`}
                   >
-                    <XCircle className="w-7 h-7" />
+                    <XCircle className="w-6 h-6" />
                     <span className="text-sm font-black tracking-wide">FAIL</span>
                   </button>
                 </div>
@@ -532,13 +726,13 @@ export default function InterviewerDashboard({ currentUser }) {
                 )}
               </div>
 
-              {/* Remark Field */}
+              {/* 4. Remark Field */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Interviewer Remark <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   required
                   value={remark}
                   onChange={(e) => {
@@ -557,26 +751,34 @@ export default function InterviewerDashboard({ currentUser }) {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
                       Previous Remarks ({evaluatingCandidate.feedbacks.length})
                     </span>
-                    {evaluatingCandidate.feedbacks.map((fb, i) => (
-                      <div
-                        key={i}
-                        className="text-xs text-slate-700 pb-1.5 border-b border-slate-200/70 last:border-none last:pb-0"
-                      >
-                        <div className="flex items-center justify-between font-bold text-[11px]">
-                          <span>
-                            {fb.round} &bull; {fb.interviewerName}
-                          </span>
-                          <span
-                            className={
-                              fb.decision === 'Reject' ? 'text-rose-600' : 'text-emerald-600'
-                            }
-                          >
-                            {fb.decision === 'Reject' ? 'FAILED' : 'PASSED'}
-                          </span>
+                    {evaluatingCandidate.feedbacks.map((fb, i) => {
+                      const fbEmp = formatEmploymentSummary(fb);
+                      return (
+                        <div
+                          key={i}
+                          className="text-xs text-slate-700 pb-1.5 border-b border-slate-200/70 last:border-none last:pb-0"
+                        >
+                          <div className="flex items-center justify-between font-bold text-[11px]">
+                            <span>
+                              {fb.round} &bull; {fb.interviewerName}
+                            </span>
+                            <span
+                              className={
+                                fb.decision === 'Reject' ? 'text-rose-600' : 'text-emerald-600'
+                              }
+                            >
+                              {fb.decision === 'Reject' ? 'FAILED' : 'PASSED'}
+                            </span>
+                          </div>
+                          {fbEmp && (
+                            <div className="text-[10px] font-semibold text-[#034665] mt-0.5">
+                              {fbEmp}
+                            </div>
+                          )}
+                          <p className="text-slate-600 italic mt-0.5">"{fb.notes}"</p>
                         </div>
-                        <p className="text-slate-600 italic mt-0.5">"{fb.notes}"</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
