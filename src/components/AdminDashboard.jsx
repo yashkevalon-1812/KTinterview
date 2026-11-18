@@ -16,7 +16,12 @@ import {
   Download,
   Building,
   Layers,
-  Check
+  Check,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  FileText
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -175,7 +180,22 @@ export default function AdminDashboard({ currentUser }) {
 
   // Export CSV
   const exportToCSV = () => {
-    const headers = ['Token', 'Name', 'Phone', 'Email', 'Role', 'Category', 'Salary / Internship', 'Status', 'Round', 'Assigned Interviewer', 'Latest Remark'];
+    const headers = [
+      'Token',
+      'Full Name',
+      'Mobile Number',
+      'Email ID',
+      'Current Address',
+      'Department',
+      'Domain',
+      'CV Link',
+      'Category',
+      'Salary / Internship',
+      'Status',
+      'Round',
+      'Assigned Interviewer',
+      'Latest Remark'
+    ];
     const rows = candidates.map(c => {
       const salaryOrIntern = c.candidateType === 'Employee'
         ? (c.salaryExpectation || 'N/A')
@@ -185,17 +205,21 @@ export default function AdminDashboard({ currentUser }) {
       const latestNote = Array.isArray(c.feedbacks) && c.feedbacks.length > 0
         ? (c.feedbacks[c.feedbacks.length - 1].notes || '').replace(/"/g, '""')
         : '';
+      const cleanAddress = (c.currentAddress || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
       return [
         c.tokenNumber,
-        `"${c.fullName}"`,
-        c.phone,
-        c.email,
-        `"${c.appliedRole}"`,
+        `"${c.fullName || ''}"`,
+        c.phone || '',
+        c.email || '',
+        `"${cleanAddress}"`,
+        `"${c.department || ''}"`,
+        `"${c.domain || c.appliedRole || ''}"`,
+        `"${c.resumeLink ? api.getFileUrl(c.resumeLink) : ''}"`,
         `"${c.candidateType || 'Pending'}"`,
         `"${salaryOrIntern}"`,
         c.status,
-        `"${c.currentRound}"`,
-        `"${c.assignedInterviewer}"`,
+        `"${c.currentRound || ''}"`,
+        `"${c.assignedInterviewer || 'Unassigned'}"`,
         `"${latestNote}"`
       ];
     });
@@ -392,7 +416,7 @@ export default function AdminDashboard({ currentUser }) {
               <tr>
                 <th className="py-3.5 px-4">Token #</th>
                 <th className="py-3.5 px-4">Candidate</th>
-                <th className="py-3.5 px-4">Applied Role</th>
+                <th className="py-3.5 px-4">Department &amp; Domain</th>
                 <th className="py-3.5 px-4">Type &amp; Salary / Intern</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4">Round</th>
@@ -419,17 +443,25 @@ export default function AdminDashboard({ currentUser }) {
                       </span>
                     </td>
 
-                    {/* Name & Contact */}
+                    {/* Name, Contact & Address */}
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900 text-sm">{c.fullName}</div>
                       <div className="text-[11px] text-slate-500">{c.phone} &bull; {c.email}</div>
+                      {c.currentAddress && (
+                        <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5 max-w-[220px] truncate" title={c.currentAddress}>
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{c.currentAddress}</span>
+                        </div>
+                      )}
                     </td>
 
-                    {/* Role */}
+                    {/* Department & Domain */}
                     <td className="py-3.5 px-4">
-                      <span className="font-semibold text-slate-800">{c.appliedRole}</span>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[150px]">
-                        {Array.isArray(c.skills) ? c.skills.join(', ') : c.skills}
+                      <div className="font-bold text-[#034665] text-xs">
+                        {c.department || 'Not Selected'}
+                      </div>
+                      <div className="text-[11px] font-medium text-slate-700 mt-0.5">
+                        {c.domain || c.appliedRole || 'Not Selected'}
                       </div>
                     </td>
 
@@ -523,6 +555,20 @@ export default function AdminDashboard({ currentUser }) {
                         >
                           Assign
                         </button>
+
+                        {/* Quick CV Link */}
+                        {c.resumeLink && (
+                          <a
+                            href={api.getFileUrl(c.resumeLink)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs transition-colors"
+                            title="Open Uploaded CV"
+                          >
+                            <FileText className="w-3 h-3" />
+                            CV
+                          </a>
+                        )}
 
                         {/* Quick View Details */}
                         <button
@@ -678,12 +724,15 @@ export default function AdminDashboard({ currentUser }) {
                 </span>
                 <div>
                   <h3 className="text-xl font-black text-slate-900 brand-font">{selectedCandidate.fullName}</h3>
-                  <p className="text-xs text-slate-500">{selectedCandidate.appliedRole} &bull; {selectedCandidate.experience}</p>
+                  <p className="text-xs text-slate-500">
+                    {selectedCandidate.department ? `${selectedCandidate.department} • ` : ''}
+                    {selectedCandidate.domain || selectedCandidate.appliedRole}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedCandidate(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 ✕
               </button>
@@ -719,15 +768,99 @@ export default function AdminDashboard({ currentUser }) {
               </div>
             </div>
 
-            {/* Candidate Details */}
-            <div className="space-y-3 text-xs mb-6">
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                <span className="text-slate-500 font-semibold">Contact:</span>
-                <span className="font-medium text-slate-800">{selectedCandidate.phone} | {selectedCandidate.email}</span>
+            {/* Candidate Submitted Form Details (All 7 Form Fields) */}
+            <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200 space-y-3 mb-5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 pb-2 border-b border-slate-200">
+                <User className="w-4 h-4 text-[#034665]" /> Candidate Submitted Form Details
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                {/* 1. Full Name */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">1. Full Name</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <User className="w-3.5 h-3.5 text-[#034665] shrink-0" />
+                    <span>{selectedCandidate.fullName || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* 2. Mobile Number */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">2. Mobile Number</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <Phone className="w-3.5 h-3.5 text-[#034665] shrink-0" />
+                    <span>{selectedCandidate.phone || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* 3. Email ID */}
+                <div className="sm:col-span-2 bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">3. Email ID</span>
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-800 break-all">
+                    <Mail className="w-3.5 h-3.5 text-[#034665] shrink-0" />
+                    <span>{selectedCandidate.email || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* 4. Current Address */}
+                <div className="sm:col-span-2 bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">4. Current Address</span>
+                  <div className="flex items-start gap-1.5 font-medium text-slate-800 leading-relaxed">
+                    <MapPin className="w-3.5 h-3.5 text-[#034665] shrink-0 mt-0.5" />
+                    <span>{selectedCandidate.currentAddress || 'Not provided'}</span>
+                  </div>
+                </div>
+
+                {/* 5. Department */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">5. Department</span>
+                  <div className="flex items-center gap-1.5 font-bold text-[#034665]">
+                    <Building className="w-3.5 h-3.5 text-[#034665] shrink-0" />
+                    <span>{selectedCandidate.department || 'Not selected'}</span>
+                  </div>
+                </div>
+
+                {/* 6. Domain */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200/90">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">6. Domain</span>
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                    <Layers className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{selectedCandidate.domain || selectedCandidate.appliedRole || 'Not selected'}</span>
+                  </div>
+                </div>
+
+                {/* 7. Uploaded CV / Resume */}
+                <div className="sm:col-span-2 bg-white p-3 rounded-xl border border-slate-200/90 flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">7. Uploaded CV / Resume</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-800 truncate">
+                      <FileText className="w-3.5 h-3.5 text-[#034665] shrink-0" />
+                      <span className="truncate">
+                        {selectedCandidate.resumeLink
+                          ? (selectedCandidate.resumeFileName || 'Candidate CV Document')
+                          : 'No CV uploaded yet'}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedCandidate.resumeLink && (
+                    <a
+                      href={api.getFileUrl(selectedCandidate.resumeLink)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#034665] hover:bg-[#022a3d] text-white text-xs font-bold transition-colors shrink-0"
+                    >
+                      View / Download CV <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
+            </div>
+
+            {/* Interview Assignment & Rounds Summary */}
+            <div className="space-y-3 text-xs mb-6">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                 <span className="text-slate-500 font-semibold">Assigned Interviewer:</span>
-                <span className="font-medium text-slate-800">{selectedCandidate.assignedInterviewer || 'Unassigned'}</span>
+                <span className="font-bold text-slate-800">{selectedCandidate.assignedInterviewer || 'Unassigned'}</span>
               </div>
               {selectedCandidate.candidateType && (
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
@@ -763,14 +896,6 @@ export default function AdminDashboard({ currentUser }) {
                   Change Rounds
                 </button>
               </div>
-              {selectedCandidate.resumeLink && (
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-sky-50 text-[#034665]">
-                  <span className="font-semibold">Candidate Resume:</span>
-                  <a href={api.getFileUrl(selectedCandidate.resumeLink)} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-bold underline">
-                    Open Resume Document <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              )}
             </div>
 
             {/* Interviewer Feedback Log */}
