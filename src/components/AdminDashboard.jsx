@@ -182,9 +182,11 @@ export default function AdminDashboard({ currentUser }) {
     try {
       const orderedRounds = ALL_INTERVIEW_ROUNDS.map(r => r.id).filter(id => targetRounds.includes(id));
       const activeRound = orderedRounds.includes(targetCurrentRound) ? targetCurrentRound : orderedRounds[0];
+      const chosenInterviewer = interviewers.find(i => i.name === targetInterviewer);
 
       await api.updateCandidate(selectedCandidate._id || selectedCandidate.tokenNumber, {
         assignedInterviewer: targetInterviewer,
+        assignedInterviewerEmail: chosenInterviewer?.email || '',
         room: targetRoom,
         assignedRounds: orderedRounds,
         currentRound: activeRound,
