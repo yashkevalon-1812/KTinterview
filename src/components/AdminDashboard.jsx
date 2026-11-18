@@ -92,10 +92,14 @@ export default function AdminDashboard({ currentUser }) {
   const handleAssignSubmit = async (e) => {
     e.preventDefault();
     if (!selectedCandidate) return;
+    if (!targetInterviewer) {
+      alert('Please select a registered interviewer.');
+      return;
+    }
 
     try {
       await api.updateCandidate(selectedCandidate._id || selectedCandidate.tokenNumber, {
-        assignedInterviewer: targetInterviewer || 'Rohit Patel',
+        assignedInterviewer: targetInterviewer,
         room: targetRoom,
         status: 'In-Interview'
       });
@@ -432,8 +436,9 @@ export default function AdminDashboard({ currentUser }) {
                         <button
                           onClick={() => {
                             setSelectedCandidate(c);
-                            setTargetInterviewer(c.assignedInterviewer || 'Rohit Patel');
-                            setTargetRoom(c.room || 'Room 1 - Tech Round');
+                            const isRegisteredAssigned = interviewers.some(i => i.name === c.assignedInterviewer);
+                            setTargetInterviewer(isRegisteredAssigned ? c.assignedInterviewer : '');
+                            setTargetRoom(c.room && c.room !== 'Waiting Lounge' ? c.room : 'Room 1 - Tech Round');
                             setAssignInterviewerModal(true);
                           }}
                           className="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-[#034665] font-bold text-xs transition-colors"
@@ -480,9 +485,11 @@ export default function AdminDashboard({ currentUser }) {
 
             <form onSubmit={handleAssignSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Interviewer (from MongoDB)</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Select Registered Interviewer</label>
                 <select
                   value={targetInterviewer}
+                  required
+                  disabled={interviewers.length === 0}
                   onChange={(e) => {
                     const chosen = interviewers.find(i => i.name === e.target.value);
                     setTargetInterviewer(e.target.value);
@@ -492,15 +499,22 @@ export default function AdminDashboard({ currentUser }) {
                       setTargetRoom('Room 1 - Tech Round');
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 bg-white disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                 >
-                  <option value="">-- Choose Interviewer from Database --</option>
+                  <option value="">
+                    {interviewers.length > 0 ? '-- Select Registered Interviewer --' : '-- No Registered Interviewers Yet --'}
+                  </option>
                   {interviewers.map((int) => (
-                    <option key={int._id || int.email} value={int.name}>
+                    <option key={int._id || int.id || int.email} value={int.name}>
                       {int.name} ({int.designation || 'Interviewer'}) &bull; {int.room || 'Room 1'}
                     </option>
                   ))}
                 </select>
+                {interviewers.length === 0 && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
+                    No interviewers have registered yet. Once an interviewer registers, their name will automatically appear here.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -528,7 +542,8 @@ export default function AdminDashboard({ currentUser }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md"
+                  disabled={interviewers.length === 0 || !targetInterviewer}
+                  className="px-5 py-2 rounded-xl bg-[#034665] hover:bg-[#022a3d] text-xs font-bold text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Dispatch
                 </button>
