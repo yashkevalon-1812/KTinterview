@@ -906,59 +906,6 @@ export default function AdminDashboard({ currentUser }) {
             </div>
 
             <form onSubmit={handleSaveRounds} className="space-y-4">
-              {/* Quick Presets */}
-              <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Quick Presets
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRounds(['Theory Round'])}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                      selectedRounds.length === 1 && selectedRounds[0] === 'Theory Round'
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Fresher (Theory Only)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRounds(['Theory Round', 'Practical Round'])}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                      selectedRounds.length === 2 && selectedRounds.includes('Theory Round') && selectedRounds.includes('Practical Round')
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Theory + Practical
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRounds(['Theory Round', 'HR Round'])}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                      selectedRounds.length === 2 && selectedRounds.includes('Theory Round') && selectedRounds.includes('HR Round')
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    Theory + HR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRounds(['Theory Round', 'Practical Round', 'HR Round'])}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
-                      selectedRounds.length === 3
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    All 3 Rounds
-                  </button>
-                </div>
-              </div>
-
               {/* 3 Selectable Round Cards */}
               <div className="space-y-2.5">
                 <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
