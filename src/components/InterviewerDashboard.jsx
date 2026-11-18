@@ -31,6 +31,17 @@ const getCandidateRounds = (cand) => {
   return ALL_ROUNDS;
 };
 
+const getAssignedRoundForInterviewer = (cand) => {
+  const candRounds = getCandidateRounds(cand);
+  if (cand?.currentRound && cand.currentRound !== 'Completed') {
+    return cand.currentRound;
+  }
+  if (Array.isArray(cand?.feedbacks) && cand.feedbacks.length > 0) {
+    return cand.feedbacks[cand.feedbacks.length - 1].round || candRounds[0];
+  }
+  return candRounds[0];
+};
+
 const formatEmploymentSummary = (obj) => {
   if (!obj?.candidateType) return '';
   if (obj.candidateType === 'Employee') {
@@ -127,12 +138,9 @@ export default function InterviewerDashboard({ currentUser }) {
     return () => clearInterval(interval);
   }, [loadAssignedCandidates]);
 
-  // Open evaluation modal for a candidate (pre-fill existing type/salary/internship if recorded)
+  // Open evaluation modal for a candidate (locked to the exact round assigned by Admin)
   const openEvaluateModal = (candidate) => {
-    const candRounds = getCandidateRounds(candidate);
-    const activeR = candRounds.includes(candidate.currentRound)
-      ? candidate.currentRound
-      : candRounds[0];
+    const activeR = getAssignedRoundForInterviewer(candidate);
     setEvaluatingCandidate(candidate);
     setEvalRound(activeR);
     setCandidateType(candidate.candidateType || '');
@@ -394,30 +402,14 @@ export default function InterviewerDashboard({ currentUser }) {
                       </div>
                     )}
 
-                    {/* Assigned Rounds & Current Round */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-slate-600 flex items-center gap-1">
-                          <Layers className="w-3.5 h-3.5 text-[#034665]" /> Current Round:
-                        </span>
-                        <span className="font-extrabold text-[#034665]">
-                          {c.currentRound || candRounds[0]}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {candRounds.map((r, i) => (
-                          <span
-                            key={r}
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                              c.currentRound === r
-                                ? 'bg-[#034665] text-white border-[#034665]'
-                                : 'bg-white text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {i + 1}. {r.replace(' Round', '')}
-                          </span>
-                        ))}
-                      </div>
+                    {/* Single Assigned Round from Admin */}
+                    <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-sky-50/70 border border-sky-200 text-xs">
+                      <span className="font-bold text-slate-600 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#034665]" /> Assigned Round:
+                      </span>
+                      <span className="font-extrabold text-[#034665]">
+                        {getAssignedRoundForInterviewer(c)}
+                      </span>
                     </div>
 
                     {/* Latest Remark Preview if recorded */}
@@ -523,27 +515,14 @@ export default function InterviewerDashboard({ currentUser }) {
                 </div>
               )}
 
-              {/* 1. Round Selection (Person-Wise Assigned Rounds) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Interview Round
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {getCandidateRounds(evaluatingCandidate).map((r, idx) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setEvalRound(r)}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        evalRound === r
-                          ? 'bg-[#034665] text-white border-[#034665] shadow-xs'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {idx + 1}. {r}
-                    </button>
-                  ))}
-                </div>
+              {/* 1. Assigned Interview Round (Fixed by Admin - No options to change) */}
+              <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-sky-50 border border-sky-200">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-[#034665]" /> Assigned Round
+                </span>
+                <span className="px-3 py-1 rounded-xl bg-[#034665] text-white text-xs font-extrabold shadow-xs">
+                  {evalRound}
+                </span>
               </div>
 
               {/* 2. Candidate Type: Employee or Intern */}
