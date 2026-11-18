@@ -17,11 +17,20 @@ import {
   AlertCircle,
   Briefcase,
   GraduationCap,
-  IndianRupee
+  IndianRupee,
+  Edit3
 } from 'lucide-react';
 import { api } from '../services/api';
 
 const ALL_ROUNDS = ['Theory Round', 'Practical Round', 'HR Round'];
+
+const canonicalRound = (roundStr = '') => {
+  const r = String(roundStr).toLowerCase();
+  if (r.includes('theory') || r.includes('technical') || r.includes('round 1')) return 'Theory Round';
+  if (r.includes('practical') || r.includes('round 2')) return 'Practical Round';
+  if (r.includes('hr') || r.includes('round 3')) return 'HR Round';
+  return roundStr || 'Theory Round';
+};
 
 const getCandidateRounds = (cand) => {
   if (Array.isArray(cand?.assignedRounds) && cand.assignedRounds.length > 0) {
@@ -70,6 +79,7 @@ export default function InterviewerDashboard({ currentUser }) {
 
   // Evaluation (Employee/Intern + Salary/Paid-Unpaid + Remark + Pass/Fail) modal state
   const [evaluatingCandidate, setEvaluatingCandidate] = useState(null);
+  const [editingFeedbackId, setEditingFeedbackId] = useState(null);
   const [evalRound, setEvalRound] = useState('Theory Round');
   const [candidateType, setCandidateType] = useState(''); // 'Employee' | 'Intern'
   const [salaryExpectation, setSalaryExpectation] = useState('');
@@ -138,21 +148,60 @@ export default function InterviewerDashboard({ currentUser }) {
     return () => clearInterval(interval);
   }, [loadAssignedCandidates]);
 
-  // Open evaluation modal for a candidate (locked to the exact round assigned by Admin)
+  // Find this interviewer's existing remark for this candidate's current/completed round (1 remark only; edit in place)
+  const getMyExistingFeedback = useCallback(
+    (candidate) => {
+      if (!candidate || !Array.isArray(candidate.feedbacks) || candidate.feedbacks.length === 0) {
+        return null;
+      }
+      const myNameLower = interviewerName.toLowerCase();
+      const myFeedbacks = candidate.feedbacks.filter(
+        (fb) => String(fb.interviewerName || '').trim().toLowerCase() === myNameLower
+      );
+      if (myFeedbacks.length === 0) return null;
+
+      // If candidate is currently in an active round, check if this interviewer already submitted for that exact round
+      if (candidate.status === 'In-Interview' && candidate.currentRound && candidate.currentRound !== 'Completed') {
+        const curCanon = canonicalRound(candidate.currentRound);
+        const matchForRound = myFeedbacks.find((fb) => canonicalRound(fb.round) === curCanon);
+        return matchForRound || null;
+      }
+
+      // Otherwise (already evaluated: Round Passed / Selected / Rejected / On-Hold), return their latest submitted remark for editing only
+      return myFeedbacks[myFeedbacks.length - 1];
+    },
+    [interviewerName]
+  );
+
+  // Open evaluation modal for a candidate (first time = Add, already submitted = Edit existing remark in place)
   const openEvaluateModal = (candidate) => {
-    const activeR = getAssignedRoundForInterviewer(candidate);
+    const existingFb = getMyExistingFeedback(candidate);
     setEvaluatingCandidate(candidate);
-    setEvalRound(activeR);
-    setCandidateType(candidate.candidateType || '');
-    setSalaryExpectation(candidate.salaryExpectation || '');
-    setInternshipType(candidate.internshipType || '');
-    setStipendAmount(candidate.stipendAmount || '');
-    setEvalResult('');
-    setRemark('');
+
+    if (existingFb) {
+      setEditingFeedbackId(existingFb._id || 'existing');
+      setEvalRound(existingFb.round || getAssignedRoundForInterviewer(candidate));
+      setCandidateType(existingFb.candidateType || candidate.candidateType || '');
+      setSalaryExpectation(existingFb.salaryExpectation || candidate.salaryExpectation || '');
+      setInternshipType(existingFb.internshipType || candidate.internshipType || '');
+      setStipendAmount(existingFb.stipendAmount || candidate.stipendAmount || '');
+      setEvalResult(existingFb.decision === 'Reject' ? 'Fail' : 'Pass');
+      setRemark(existingFb.notes || '');
+    } else {
+      const activeR = getAssignedRoundForInterviewer(candidate);
+      setEditingFeedbackId(null);
+      setEvalRound(activeR);
+      setCandidateType(candidate.candidateType || '');
+      setSalaryExpectation(candidate.salaryExpectation || '');
+      setInternshipType(candidate.internshipType || '');
+      setStipendAmount(candidate.stipendAmount || '');
+      setEvalResult('');
+      setRemark('');
+    }
     setModalError('');
   };
 
-  // Submit Candidate Type + Salary/Internship + Remark + Pass / Fail result
+  // Submit or Update Remark + Pass / Fail result (strictly 1 remark per interviewer per round)
   const handleSubmitResult = async (e) => {
     e.preventDefault();
     if (!evaluatingCandidate) return;
@@ -183,6 +232,7 @@ export default function InterviewerDashboard({ currentUser }) {
 
     try {
       const payload = {
+        feedbackId: editingFeedbackId && editingFeedbackId !== 'existing' ? editingFeedbackId : undefined,
         interviewerName: interviewerName || 'Interviewer',
         round: evalRound,
         decision: evalResult === 'Pass' ? 'Advance' : 'Reject',
@@ -202,10 +252,13 @@ export default function InterviewerDashboard({ currentUser }) {
       if (res.success) {
         const verdictLabel = evalResult === 'Pass' ? 'PASSED' : 'FAILED';
         setToastMsg(
-          `Result saved for ${evaluatingCandidate.fullName} (${evaluatingCandidate.tokenNumber}) — Marked as ${verdictLabel}.`
+          editingFeedbackId
+            ? `Remark updated for ${evaluatingCandidate.fullName} (${evaluatingCandidate.tokenNumber}) — ${verdictLabel}.`
+            : `Result saved for ${evaluatingCandidate.fullName} (${evaluatingCandidate.tokenNumber}) — Marked as ${verdictLabel}.`
         );
         setTimeout(() => setToastMsg(''), 5000);
         setEvaluatingCandidate(null);
+        setEditingFeedbackId(null);
         setRemark('');
         setEvalResult('');
         loadAssignedCandidates(false);
@@ -315,12 +368,12 @@ export default function InterviewerDashboard({ currentUser }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {assignedCandidates.map((c) => {
-              const candRounds = getCandidateRounds(c);
-              const isCompleted = c.status === 'Selected' || c.status === 'Rejected';
+              const myExistingFb = getMyExistingFeedback(c);
               const lastFeedback =
-                Array.isArray(c.feedbacks) && c.feedbacks.length > 0
+                myExistingFb ||
+                (Array.isArray(c.feedbacks) && c.feedbacks.length > 0
                   ? c.feedbacks[c.feedbacks.length - 1]
-                  : null;
+                  : null);
               const employmentInfo = formatEmploymentSummary(c);
 
               return (
@@ -462,13 +515,20 @@ export default function InterviewerDashboard({ currentUser }) {
                       type="button"
                       onClick={() => openEvaluateModal(c)}
                       className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
-                        isCompleted
-                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                        myExistingFb
+                          ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
                           : 'bg-[#034665] hover:bg-[#022a3d] text-white shadow-md'
                       }`}
                     >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {isCompleted ? 'Update Remark / Result' : 'Add Remark & Pass / Fail'}
+                      {myExistingFb ? (
+                        <>
+                          <Edit3 className="w-3.5 h-3.5" /> Edit Remark & Result
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-3.5 h-3.5" /> Add Remark & Pass / Fail
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -524,6 +584,15 @@ export default function InterviewerDashboard({ currentUser }) {
                   {evalRound}
                 </span>
               </div>
+
+              {editingFeedbackId && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                  <Edit3 className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <b>Editing Your Existing Remark:</b> Only one remark can be submitted per round. Any changes will update your existing remark.
+                  </span>
+                </div>
+              )}
 
               {/* 2. Candidate Type: Employee or Intern */}
               <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
@@ -781,8 +850,12 @@ export default function InterviewerDashboard({ currentUser }) {
                       : 'bg-[#034665] hover:bg-[#022a3d]'
                   }`}
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {submitting ? 'Saving Result...' : 'Submit Remark & Result'}
+                  {editingFeedbackId ? <Edit3 className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                  {submitting
+                    ? 'Saving...'
+                    : editingFeedbackId
+                    ? 'Save Updated Remark'
+                    : 'Submit Remark & Result'}
                 </button>
               </div>
             </form>
